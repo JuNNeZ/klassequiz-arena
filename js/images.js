@@ -81,6 +81,30 @@ export function fileToDataURL(file, max = 960, quality = 0.82) {
   });
 }
 
+// Henter et billede fra nettet og gemmer det i quizzen, så spillet ikke afhænger af den anden server.
+// Mislykkes det (fx en side uden CORS), beholdes linket.
+export async function localize(img, max = 800) {
+  if (!img || !img.src || !/^https?:/.test(img.src)) return img;
+  for (let a = 0; a < 3; a++) {
+    try {
+      const r = await fetch(img.src, { mode: 'cors' });
+      if (r.status === 429) { await new Promise(res => setTimeout(res, 2000 * (a + 1))); continue; }
+      if (!r.ok) break;
+      const blob = await r.blob();
+      const src = await fileToDataURL(new File([blob], 'b', { type: blob.type || 'image/jpeg' }), max, 0.8);
+      return { ...img, src, orig: img.src };
+    } catch (e) { break; }
+  }
+  return img;
+}
+export async function localizeQuiz(q, onStep) {
+  let n = 0;
+  for (const x of q.questions) {
+    if (x.img && /^https?:/.test(x.img.src)) { x.img = await localize(x.img); n++; if (onStep) onStep(n); }
+  }
+  return q;
+}
+
 /* ---------- billedvælger (modal) ---------- */
 let resolver = null, current = null;
 
@@ -113,7 +137,7 @@ async function runSearch(q) {
     const r = await commonsSearch(q, 16);
     if (!r.length) { box.innerHTML = '<p class="muted">Ingen billeder fundet. Prøv et andet ord, gerne på engelsk.</p>'; return; }
     box.innerHTML = r.map((x, i) => `<button class="ip-hit" type="button" data-i="${i}"><img src="${esc(x.src)}" alt="" loading="lazy"><span>${esc(x.credit)} · ${esc(x.lic || 'fri licens')}</span></button>`).join('');
-    $$('.ip-hit', box).forEach(b => { b.onclick = () => { const x = r[+b.dataset.i]; close({ src: x.src, credit: x.credit, lic: x.lic, page: x.page }); }; });
+    $$('.ip-hit', box).forEach(b => { b.onclick = async () => { const x = r[+b.dataset.i]; b.disabled = true; b.querySelector('span').textContent = 'Henter…'; close(await localize({ src: x.src, credit: x.credit, lic: x.lic, page: x.page })); }; });
   } catch (e) {
     box.innerHTML = ''; err('Kunne ikke søge efter billeder. Tjek internetforbindelsen.');
   }
@@ -132,7 +156,7 @@ export function initImagePicker() {
     const u = $('#ip-url').value.trim();
     if (!/^https:\/\/\S+$/i.test(u)) { err('Indsæt et link, der starter med https://'); return; }
     const test = new Image();
-    test.onload = () => close({ src: u });
+    test.onload = async () => close(await localize({ src: u }));
     test.onerror = () => err('Billedet kunne ikke hentes fra linket. Brug et direkte link til en billedfil.');
     test.src = u;
   };
@@ -142,5 +166,13 @@ export function initImagePicker() {
 export function imgHTML(img, cls = '') {
   if (!img || !img.src) return '';
   const credit = img.credit ? `<figcaption>${img.page ? `<a href="${esc(img.page)}" target="_blank" rel="noopener">` : ''}${esc(img.credit)}${img.lic ? ' · ' + esc(img.lic) : ''}${img.page ? '</a>' : ''}</figcaption>` : '';
-  return `<figure class="qimg ${cls}"><img src="${esc(img.src)}" alt="" decoding="async" onerror="this.closest('figure').hidden=true">${credit}</figure>`;
+  return `<figure class="qimg ${cls}"><img src="${esc(img.src)}" alt="" decoding="async" onerror="kqaImgErr(this)">${credit}</figure>`;
 }
+
+// Et billede, der ikke kan hentes, prøves igen én gang efter lidt tid; ellers skjules det.
+window.kqaImgErr = el => {
+  if (el.dataset.retry) { const f = el.closest('figure'); if (f) f.hidden = true; else el.remove(); return; }
+  el.dataset.retry = '1';
+  const src = el.src;
+  setTimeout(() => { el.src = src + (src.includes('?') ? '&' : '?') + 'r=1'; }, 2500);
+};

@@ -3,7 +3,7 @@ import { loadAll, putQuiz, deleteQuiz } from './store.js';
 import { csvToQuiz, quizToBlooketCSV, quizToJSON, jsonToQuizzes, encodeShare, decodeShare } from './csv.js';
 import { MODES, prepQuestions, selfQuestions } from './modes.js';
 import { BUILTIN } from './data.js';
-import { initImagePicker } from './images.js';
+import { initImagePicker, localizeQuiz } from './images.js';
 import { initEditor, openEditor, editorOpen } from './editor.js';
 import { stage, show, initStage } from './stage.js';
 import { startBoard } from './board.js';
@@ -37,7 +37,7 @@ function renderLib() {
     const imgs = q.questions.filter(x => x.img).length;
     const cover = q.questions.find(x => x.img);
     return `<article class="card" data-id="${esc(q.id)}">
-    <div class="card-cover" data-world="${coverWorld(q)}">${cover ? `<img src="${esc(cover.img.src)}" alt="" loading="lazy" onerror="this.remove()">` : ''}<span class="card-subject">${esc(q.subject || 'Quiz')}</span></div>
+    <div class="card-cover" data-world="${coverWorld(q)}">${cover ? `<img src="${esc(cover.img.src)}" alt="" loading="lazy" onerror="kqaImgErr(this)">` : ''}<span class="card-subject">${esc(q.subject || 'Quiz')}</span></div>
     <div class="card-body">
       <h3>${esc(q.title || 'Uden titel')}</h3>
       <p class="muted small">${[q.grade, q.questions.length + ' spørgsmål', imgs ? imgs + ' med billede' : '', q.builtin ? 'eksempel' : ''].filter(Boolean).map(esc).join(', ')}</p>
@@ -195,6 +195,12 @@ async function init() {
   setSoundBtn();
   window.addEventListener('hashchange', () => { if (!location.hash.startsWith('#ov=')) $('#shared-bar').hidden = true; route(); });
   OWN = await loadAll();
+  // Gem billeder fra nettet i quizzerne (i baggrunden), så de ikke forsvinder, når Wikimedia begrænser trafikken
+  setTimeout(async () => {
+    for (const q of OWN.filter(x => x.questions.some(y => y.img && /^https?:/.test(y.img.src)))) {
+      try { await localizeQuiz(q); await putQuiz(q); } catch (e) { /* prøv igen næste gang */ }
+    }
+  }, 1500);
   if (new URLSearchParams(location.search).get('kode') && !location.hash) history.replaceState(null, '', location.search + '#deltag');
   route();
 }

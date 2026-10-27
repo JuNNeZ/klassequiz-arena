@@ -1,7 +1,7 @@
 // Quiz-editor med billeder.
 import { $, $$, esc, clone, newId, LET, toast } from './util.js';
 import { TIMES } from './csv.js';
-import { openImagePicker, autoSearch, keywords } from './images.js';
+import { openImagePicker, autoSearch, keywords, localize, localizeQuiz } from './images.js';
 import { show } from './stage.js';
 import { shapeSVG } from './ui.js';
 
@@ -95,7 +95,7 @@ async function autoImages() {
     try {
       const { results } = await autoSearch(todo[k].q.q, $('#ed-subject').value);
       const hit = results.find(r => !used.has(r.src) && r.w >= r.h * 0.9) || results.find(r => !used.has(r.src));
-      if (hit && ED) { todo[k].q.img = { src: hit.src, credit: hit.credit, lic: hit.lic, page: hit.page }; used.add(hit.src); found++; }
+      if (hit && ED) { todo[k].q.img = await localize({ src: hit.src, credit: hit.credit, lic: hit.lic, page: hit.page }); used.add(hit.src); found++; }
     } catch (e) { /* spring over */ }
   }
   btn.disabled = false; btn.textContent = 'Find billeder automatisk';
@@ -120,7 +120,13 @@ async function save_() {
   const box = $('#ed-errs');
   if (errs.length) { box.innerHTML = '<b>Ret dette, før du gemmer:</b><ul>' + errs.map(m => '<li>' + esc(m) + '</li>').join('') + '</ul>'; box.hidden = false; render(bad); window.scrollTo(0, 0); return; }
   box.hidden = true;
-  const q = clone(ED); ED = null;
+  const q = clone(ED);
+  if (q.questions.some(x => x.img && /^https?:/.test(x.img.src))) {
+    const b = $('#ed-save'); b.disabled = true;
+    await localizeQuiz(q, n => { b.textContent = `Gemmer billeder… ${n}`; });
+    b.disabled = false; b.textContent = 'Gem quiz';
+  }
+  ED = null;
   await onSave(q);
 }
 export const editorOpen = () => !!ED;
