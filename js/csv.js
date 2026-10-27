@@ -96,7 +96,7 @@ export function sanitizeQuiz(q) {
       const a = [0, 1, 2, 3].map(i => String((x.a || [])[i] || '').slice(0, 120));
       const c = (x.c || []).filter(i => Number.isInteger(i) && a[i]);
       const o = { q: String(x.q || '').slice(0, 300), a, c: c.length ? c : [Math.max(0, a.findIndex(Boolean))], t: nearestTime(+x.t || 20) };
-      if (x.img && typeof x.img.src === 'string' && (/^https:\/\//.test(x.img.src) || /^data:image\//.test(x.img.src))) {
+      if (x.img && typeof x.img.src === 'string' && (/^https:\/\//.test(x.img.src) || /^data:image\//.test(x.img.src) || /^img\/ex\/[\w.-]+$/.test(x.img.src))) {
         o.img = { src: x.img.src };
         ['credit', 'lic', 'page'].forEach(k => { if (typeof x.img[k] === 'string') o.img[k] = x.img[k].slice(0, 300); });
       }
@@ -113,7 +113,7 @@ async function pipe(bytes, stream) { return new Uint8Array(await new Response(ne
 export async function encodeShare(q) {
   const slim = { title: q.title, subject: q.subject, grade: q.grade, questions: q.questions.map(x => {
     const o = { q: x.q, a: x.a, c: x.c, t: x.t };
-    if (x.img && /^https:/.test(x.img.src)) o.img = { src: x.img.src, credit: x.img.credit, lic: x.img.lic, page: x.img.page };
+    if (x.img && /^(https:|img\/ex\/)/.test(x.img.src)) o.img = { src: new URL(x.img.src, location.href).href, credit: x.img.credit, lic: x.img.lic, page: x.img.page };
     return o;
   }) };
   const raw = new TextEncoder().encode(JSON.stringify(slim));

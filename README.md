@@ -43,6 +43,7 @@ Hver spiltype har sin egen pausemusik (Quizshow, Skattejagt, Stadion, Racerbane,
 - Live-spil kører peer-to-peer med [PeerJS](https://peerjs.com/) (MIT). Lærerens browser er vært; svar sendes direkte mellem enhederne. Der gemmes ingen elevdata på nogen server. PeerJS' gratis forbindelsesserver bruges kun til at finde hinanden.
 - Hvis en direkte forbindelse ikke lykkes (fx på styrede Chromebooks), skifter eleven automatisk til et TURN-relæ fra [Open Relay](https://www.metered.ca/tools/openrelay/) over port 443/80. Kun spillets beskeder sendes igennem.
 - QR-koder: [qrcode-generator](https://github.com/kazuhikoarase/qrcode-generator) (MIT).
-- Billeder i eksempelquizzerne er fra Wikimedia Commons under frie licenser. Fotograf og licens vises under hvert billede.
+- Billeder i eksempelquizzerne er fra Wikimedia Commons under frie licenser og ligger i `img/ex/`. Fotograf og licens vises under hvert billede.
+- Billeder, man vælger i editoren, gemmes direkte i quizzen. Wikimedia begrænser direkte visning, når mange elever på samme net henter billeder på én gang.
 
 Lokal test af live-spil med egen PeerJS-server: tilføj `?peer=localhost:9000` til adressen.

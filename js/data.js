@@ -20,10 +20,11 @@ export const BUILTIN = [
     ],
     "t": 30,
     "img": {
-     "src": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/87/White_slice_and_supreme_slice.jpg/960px-White_slice_and_supreme_slice.jpg",
+     "src": "img/ex/White_slice_and_supreme_slice.jpg",
      "credit": "Afshin Darian",
      "lic": "CC BY 2.0",
-     "page": "https://commons.wikimedia.org/wiki/File:White_slice_and_supreme_slice.jpg"
+     "page": "https://commons.wikimedia.org/wiki/File:White_slice_and_supreme_slice.jpg",
+     "orig": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/87/White_slice_and_supreme_slice.jpg/960px-White_slice_and_supreme_slice.jpg"
     }
    },
    {
@@ -39,10 +40,11 @@ export const BUILTIN = [
     ],
     "t": 30,
     "img": {
-     "src": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/83/Egg_cartons_with_chicken_eggs_03.jpg/960px-Egg_cartons_with_chicken_eggs_03.jpg",
+     "src": "img/ex/Egg_cartons_with_chicken_eggs_03.jpg",
      "credit": "Krzysztof Golik",
      "lic": "CC BY-SA 4.0",
-     "page": "https://commons.wikimedia.org/wiki/File:Egg_cartons_with_chicken_eggs_03.jpg"
+     "page": "https://commons.wikimedia.org/wiki/File:Egg_cartons_with_chicken_eggs_03.jpg",
+     "orig": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/83/Egg_cartons_with_chicken_eggs_03.jpg/960px-Egg_cartons_with_chicken_eggs_03.jpg"
     }
    },
    {
@@ -58,10 +60,11 @@ export const BUILTIN = [
     ],
     "t": 45,
     "img": {
-     "src": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e3/Oranges_-_whole-halved-segment.jpg/960px-Oranges_-_whole-halved-segment.jpg",
+     "src": "img/ex/Oranges_-_whole-halved-segment.jpg",
      "credit": "Ivar Leidus",
      "lic": "CC BY-SA 4.0",
-     "page": "https://commons.wikimedia.org/wiki/File:Oranges_-_whole-halved-segment.jpg"
+     "page": "https://commons.wikimedia.org/wiki/File:Oranges_-_whole-halved-segment.jpg",
+     "orig": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e3/Oranges_-_whole-halved-segment.jpg/960px-Oranges_-_whole-halved-segment.jpg"
     }
    },
    {
@@ -77,10 +80,11 @@ export const BUILTIN = [
     ],
     "t": 20,
     "img": {
-     "src": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/59/Yellow_lemon_cut_in_half.jpg/960px-Yellow_lemon_cut_in_half.jpg",
+     "src": "img/ex/Yellow_lemon_cut_in_half.jpg",
      "credit": "Annatsach",
      "lic": "CC BY-SA 4.0",
-     "page": "https://commons.wikimedia.org/wiki/File:Yellow_lemon_cut_in_half.jpg"
+     "page": "https://commons.wikimedia.org/wiki/File:Yellow_lemon_cut_in_half.jpg",
+     "orig": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/59/Yellow_lemon_cut_in_half.jpg/960px-Yellow_lemon_cut_in_half.jpg"
     }
    },
    {
@@ -109,10 +113,11 @@ export const BUILTIN = [
     ],
     "t": 20,
     "img": {
-     "src": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/33/Fresh_made_bread_05.jpg/960px-Fresh_made_bread_05.jpg",
+     "src": "img/ex/Fresh_made_bread_05.jpg",
      "credit": "FranHogan",
      "lic": "CC BY-SA 4.0",
-     "page": "https://commons.wikimedia.org/wiki/File:Fresh_made_bread_05.jpg"
+     "page": "https://commons.wikimedia.org/wiki/File:Fresh_made_bread_05.jpg",
+     "orig": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/33/Fresh_made_bread_05.jpg/960px-Fresh_made_bread_05.jpg"
     }
    },
    {
@@ -128,10 +133,11 @@ export const BUILTIN = [
     ],
     "t": 30,
     "img": {
-     "src": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8b/Cherry_pie_with_ice_cream.jpg/960px-Cherry_pie_with_ice_cream.jpg",
+     "src": "img/ex/Cherry_pie_with_ice_cream.jpg",
      "credit": "stu_spivack",
      "lic": "CC BY-SA 2.0",
-     "page": "https://commons.wikimedia.org/wiki/File:Cherry_pie_with_ice_cream.jpg"
+     "page": "https://commons.wikimedia.org/wiki/File:Cherry_pie_with_ice_cream.jpg",
+     "orig": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8b/Cherry_pie_with_ice_cream.jpg/960px-Cherry_pie_with_ice_cream.jpg"
     }
    },
    {
@@ -196,10 +202,11 @@ export const BUILTIN = [
     ],
     "t": 20,
     "img": {
-     "src": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/ca/SusaaenDK.jpg/960px-SusaaenDK.jpg",
+     "src": "img/ex/SusaaenDK.jpg",
      "credit": "Niels Elgaard Larsen",
      "lic": "CC BY-SA 4.0",
-     "page": "https://commons.wikimedia.org/wiki/File:SusaaenDK.jpg"
+     "page": "https://commons.wikimedia.org/wiki/File:SusaaenDK.jpg",
+     "orig": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/ca/SusaaenDK.jpg/960px-SusaaenDK.jpg"
     }
    },
    {
@@ -215,10 +222,11 @@ export const BUILTIN = [
     ],
     "t": 20,
     "img": {
-     "src": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/60/Tystrup_S%C3%B8_-_panoramio_%287%29.jpg/960px-Tystrup_S%C3%B8_-_panoramio_%287%29.jpg",
+     "src": "img/ex/Tystrup_SC3B8_-_panoramio_28729.jpg",
      "credit": "Mads Sabroe",
      "lic": "CC BY-SA 3.0",
-     "page": "https://commons.wikimedia.org/wiki/File:Tystrup_S%C3%B8_-_panoramio_(7).jpg"
+     "page": "https://commons.wikimedia.org/wiki/File:Tystrup_S%C3%B8_-_panoramio_(7).jpg",
+     "orig": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/60/Tystrup_S%C3%B8_-_panoramio_%287%29.jpg/960px-Tystrup_S%C3%B8_-_panoramio_%287%29.jpg"
     }
    },
    {
@@ -234,10 +242,11 @@ export const BUILTIN = [
     ],
     "t": 15,
     "img": {
-     "src": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8f/The_German-Danish_border_-_panoramio.jpg/960px-The_German-Danish_border_-_panoramio.jpg",
+     "src": "img/ex/The_German-Danish_border_-_panoramio.jpg",
      "credit": "Sten Dueland",
      "lic": "CC BY 3.0",
-     "page": "https://commons.wikimedia.org/wiki/File:The_German-Danish_border_-_panoramio.jpg"
+     "page": "https://commons.wikimedia.org/wiki/File:The_German-Danish_border_-_panoramio.jpg",
+     "orig": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8f/The_German-Danish_border_-_panoramio.jpg/960px-The_German-Danish_border_-_panoramio.jpg"
     }
    },
    {
@@ -253,10 +262,11 @@ export const BUILTIN = [
     ],
     "t": 20,
     "img": {
-     "src": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7c/Christiansborg_Slot_Copenhagen_2014_01.jpg/960px-Christiansborg_Slot_Copenhagen_2014_01.jpg",
+     "src": "img/ex/Christiansborg_Slot_Copenhagen_2014_01.jpg",
      "credit": "Julian Herzog",
      "lic": "CC BY 4.0",
-     "page": "https://commons.wikimedia.org/wiki/File:Christiansborg_Slot_Copenhagen_2014_01.jpg"
+     "page": "https://commons.wikimedia.org/wiki/File:Christiansborg_Slot_Copenhagen_2014_01.jpg",
+     "orig": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7c/Christiansborg_Slot_Copenhagen_2014_01.jpg/960px-Christiansborg_Slot_Copenhagen_2014_01.jpg"
     }
    },
    {
@@ -272,10 +282,11 @@ export const BUILTIN = [
     ],
     "t": 20,
     "img": {
-     "src": "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f1/Arne_Jacobsen_-_R%C3%B8dovre_Town_Hall_cropped.jpg/960px-Arne_Jacobsen_-_R%C3%B8dovre_Town_Hall_cropped.jpg",
+     "src": "img/ex/Arne_Jacobsen_-_RC3B8dovre_Town_Hall_cropped.jpg",
      "credit": "seier+seier",
      "lic": "CC BY-SA 4.0",
-     "page": "https://commons.wikimedia.org/wiki/File:Arne_Jacobsen_-_R%C3%B8dovre_Town_Hall_cropped.jpg"
+     "page": "https://commons.wikimedia.org/wiki/File:Arne_Jacobsen_-_R%C3%B8dovre_Town_Hall_cropped.jpg",
+     "orig": "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f1/Arne_Jacobsen_-_R%C3%B8dovre_Town_Hall_cropped.jpg/960px-Arne_Jacobsen_-_R%C3%B8dovre_Town_Hall_cropped.jpg"
     }
    },
    {
@@ -291,10 +302,11 @@ export const BUILTIN = [
     ],
     "t": 20,
     "img": {
-     "src": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d4/Bornholm_-_north_coast.jpg/960px-Bornholm_-_north_coast.jpg",
+     "src": "img/ex/Bornholm_-_north_coast.jpg",
      "credit": "Andreas Lippelt",
      "lic": "CC BY 2.0",
-     "page": "https://commons.wikimedia.org/wiki/File:Bornholm_-_north_coast.jpg"
+     "page": "https://commons.wikimedia.org/wiki/File:Bornholm_-_north_coast.jpg",
+     "orig": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d4/Bornholm_-_north_coast.jpg/960px-Bornholm_-_north_coast.jpg"
     }
    },
    {
@@ -310,10 +322,11 @@ export const BUILTIN = [
     ],
     "t": 20,
     "img": {
-     "src": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/09/Grenen_overview_from_Skagen_Fyr_May_2019.jpg/960px-Grenen_overview_from_Skagen_Fyr_May_2019.jpg",
+     "src": "img/ex/Grenen_overview_from_Skagen_Fyr_May_2019.jpg",
      "credit": "ThomasLendt",
      "lic": "CC BY-SA 4.0",
-     "page": "https://commons.wikimedia.org/wiki/File:Grenen_overview_from_Skagen_Fyr_May_2019.jpg"
+     "page": "https://commons.wikimedia.org/wiki/File:Grenen_overview_from_Skagen_Fyr_May_2019.jpg",
+     "orig": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/09/Grenen_overview_from_Skagen_Fyr_May_2019.jpg/960px-Grenen_overview_from_Skagen_Fyr_May_2019.jpg"
     }
    },
    {
@@ -329,10 +342,11 @@ export const BUILTIN = [
     ],
     "t": 20,
     "img": {
-     "src": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/79/Limfjorden_Agger_Sund_Denmark_%282026-08-27%29.jpg/960px-Limfjorden_Agger_Sund_Denmark_%282026-08-27%29.jpg",
+     "src": "img/ex/Limfjorden_Agger_Sund_Denmark_282026-08-2729.jpg",
      "credit": "Olgierd Rudak",
      "lic": "CC BY-SA 4.0",
-     "page": "https://commons.wikimedia.org/wiki/File:Limfjorden_Agger_Sund_Denmark_(2026-08-27).jpg"
+     "page": "https://commons.wikimedia.org/wiki/File:Limfjorden_Agger_Sund_Denmark_(2026-08-27).jpg",
+     "orig": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/79/Limfjorden_Agger_Sund_Denmark_%282026-08-27%29.jpg/960px-Limfjorden_Agger_Sund_Denmark_%282026-08-27%29.jpg"
     }
    },
    {
@@ -348,10 +362,11 @@ export const BUILTIN = [
     ],
     "t": 15,
     "img": {
-     "src": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/69/M%C3%B8ns_Klint_chalk_cliffs_1.jpg/960px-M%C3%B8ns_Klint_chalk_cliffs_1.jpg",
+     "src": "img/ex/MC3B8ns_Klint_chalk_cliffs_1.jpg",
      "credit": "kallerna",
      "lic": "CC BY-SA 4.0",
-     "page": "https://commons.wikimedia.org/wiki/File:M%C3%B8ns_Klint_chalk_cliffs_1.jpg"
+     "page": "https://commons.wikimedia.org/wiki/File:M%C3%B8ns_Klint_chalk_cliffs_1.jpg",
+     "orig": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/69/M%C3%B8ns_Klint_chalk_cliffs_1.jpg/960px-M%C3%B8ns_Klint_chalk_cliffs_1.jpg"
     }
    },
    {
@@ -367,10 +382,11 @@ export const BUILTIN = [
     ],
     "t": 20,
     "img": {
-     "src": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1f/Mols_Bjerge_x.jpg/960px-Mols_Bjerge_x.jpg",
+     "src": "img/ex/Mols_Bjerge_x.jpg",
      "credit": "Sebastian Nils",
      "lic": "CC BY-SA 3.0",
-     "page": "https://commons.wikimedia.org/wiki/File:Mols_Bjerge_x.jpg"
+     "page": "https://commons.wikimedia.org/wiki/File:Mols_Bjerge_x.jpg",
+     "orig": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1f/Mols_Bjerge_x.jpg/960px-Mols_Bjerge_x.jpg"
     }
    },
    {
@@ -386,10 +402,11 @@ export const BUILTIN = [
     ],
     "t": 15,
     "img": {
-     "src": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/84/2018_-_Nyhavn_on_sunset.jpg/960px-2018_-_Nyhavn_on_sunset.jpg",
+     "src": "img/ex/2018_-_Nyhavn_on_sunset.jpg",
      "credit": "Moahim",
      "lic": "CC BY-SA 4.0",
-     "page": "https://commons.wikimedia.org/wiki/File:2018_-_Nyhavn_on_sunset.jpg"
+     "page": "https://commons.wikimedia.org/wiki/File:2018_-_Nyhavn_on_sunset.jpg",
+     "orig": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/84/2018_-_Nyhavn_on_sunset.jpg/960px-2018_-_Nyhavn_on_sunset.jpg"
     }
    }
   ]
@@ -479,10 +496,11 @@ export const BUILTIN = [
     ],
     "t": 20,
     "img": {
-     "src": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6d/Running_dog_at_the_beach.jpg/960px-Running_dog_at_the_beach.jpg",
+     "src": "img/ex/Running_dog_at_the_beach.jpg",
      "credit": "JurgenNL",
      "lic": "CC BY-SA 3.0",
-     "page": "https://commons.wikimedia.org/wiki/File:Running_dog_at_the_beach.jpg"
+     "page": "https://commons.wikimedia.org/wiki/File:Running_dog_at_the_beach.jpg",
+     "orig": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6d/Running_dog_at_the_beach.jpg/960px-Running_dog_at_the_beach.jpg"
     }
    },
    {
@@ -498,10 +516,11 @@ export const BUILTIN = [
     ],
     "t": 20,
     "img": {
-     "src": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/44/Open_book_with_apples_placed_on_a_wooden_table_in_a_bright_indoor_setting.jpg/960px-Open_book_with_apples_placed_on_a_wooden_table_in_a_bright_indoor_setting.jpg",
+     "src": "img/ex/Open_book_with_apples_placed_on_a_wooden_table_in_a_bright_i.jpg",
      "credit": "Shixart1985",
      "lic": "CC BY 2.0",
-     "page": "https://commons.wikimedia.org/wiki/File:Open_book_with_apples_placed_on_a_wooden_table_in_a_bright_indoor_setting.jpg"
+     "page": "https://commons.wikimedia.org/wiki/File:Open_book_with_apples_placed_on_a_wooden_table_in_a_bright_indoor_setting.jpg",
+     "orig": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/44/Open_book_with_apples_placed_on_a_wooden_table_in_a_bright_indoor_setting.jpg/960px-Open_book_with_apples_placed_on_a_wooden_table_in_a_bright_indoor_setting.jpg"
     }
    },
    {
@@ -531,10 +550,11 @@ export const BUILTIN = [
     ],
     "t": 20,
     "img": {
-     "src": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/80/Moscow._A_500-year-old_oak_tree_in_Kolomenskoe1.jpg/960px-Moscow._A_500-year-old_oak_tree_in_Kolomenskoe1.jpg",
+     "src": "img/ex/Moscow._A_500-year-old_oak_tree_in_Kolomenskoe1.jpg",
      "credit": "Юрий Д.К.",
      "lic": "CC BY 4.0",
-     "page": "https://commons.wikimedia.org/wiki/File:Moscow._A_500-year-old_oak_tree_in_Kolomenskoe1.jpg"
+     "page": "https://commons.wikimedia.org/wiki/File:Moscow._A_500-year-old_oak_tree_in_Kolomenskoe1.jpg",
+     "orig": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/80/Moscow._A_500-year-old_oak_tree_in_Kolomenskoe1.jpg/960px-Moscow._A_500-year-old_oak_tree_in_Kolomenskoe1.jpg"
     }
    },
    {
@@ -550,10 +570,11 @@ export const BUILTIN = [
     ],
     "t": 20,
     "img": {
-     "src": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a1/Marielundsskoven-Forest_in_Kolding_Denmark_2009_25_05a.jpg/960px-Marielundsskoven-Forest_in_Kolding_Denmark_2009_25_05a.jpg",
+     "src": "img/ex/Marielundsskoven-Forest_in_Kolding_Denmark_2009_25_05a.jpg",
      "credit": "S.Juhl",
      "lic": "Public domain",
-     "page": "https://commons.wikimedia.org/wiki/File:Marielundsskoven-Forest_in_Kolding_Denmark_2009_25_05a.jpg"
+     "page": "https://commons.wikimedia.org/wiki/File:Marielundsskoven-Forest_in_Kolding_Denmark_2009_25_05a.jpg",
+     "orig": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a1/Marielundsskoven-Forest_in_Kolding_Denmark_2009_25_05a.jpg/960px-Marielundsskoven-Forest_in_Kolding_Denmark_2009_25_05a.jpg"
     }
    }
   ]
@@ -578,10 +599,11 @@ export const BUILTIN = [
     ],
     "t": 15,
     "img": {
-     "src": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c7/Saturn_during_Equinox.jpg/960px-Saturn_during_Equinox.jpg",
+     "src": "img/ex/Saturn_during_Equinox.jpg",
      "credit": "NASA / JPL / Space Science Institute",
      "lic": "Public domain",
-     "page": "https://commons.wikimedia.org/wiki/File:Saturn_during_Equinox.jpg"
+     "page": "https://commons.wikimedia.org/wiki/File:Saturn_during_Equinox.jpg",
+     "orig": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c7/Saturn_during_Equinox.jpg/960px-Saturn_during_Equinox.jpg"
     }
    },
    {
@@ -597,10 +619,11 @@ export const BUILTIN = [
     ],
     "t": 15,
     "img": {
-     "src": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/90/Custer_Astronomical_Observatory_-_Southold_New_York_USA_-_Dome_and_Radio_Telescope.jpg/960px-Custer_Astronomical_Observatory_-_Southold_New_York_USA_-_Dome_and_Radio_Telescope.jpg",
+     "src": "img/ex/Custer_Astronomical_Observatory_-_Southold_New_York_USA_-_Do.jpg",
      "credit": "Astroval1",
      "lic": "CC BY-SA 4.0",
-     "page": "https://commons.wikimedia.org/wiki/File:Custer_Astronomical_Observatory_-_Southold_New_York_USA_-_Dome_and_Radio_Telescope.jpg"
+     "page": "https://commons.wikimedia.org/wiki/File:Custer_Astronomical_Observatory_-_Southold_New_York_USA_-_Dome_and_Radio_Telescope.jpg",
+     "orig": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/90/Custer_Astronomical_Observatory_-_Southold_New_York_USA_-_Dome_and_Radio_Telescope.jpg/960px-Custer_Astronomical_Observatory_-_Southold_New_York_USA_-_Dome_and_Radio_Telescope.jpg"
     }
    },
    {
@@ -616,10 +639,11 @@ export const BUILTIN = [
     ],
     "t": 15,
     "img": {
-     "src": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b4/The_Sun_by_the_Atmospheric_Imaging_Assembly_of_NASA%27s_Solar_Dynamics_Observatory_-_20100819.jpg/960px-The_Sun_by_the_Atmospheric_Imaging_Assembly_of_NASA%27s_Solar_Dynamics_Observatory_-_20100819.jpg",
+     "src": "img/ex/The_Sun_by_the_Atmospheric_Imaging_Assembly_of_NASA27s_Sola.jpg",
      "credit": "NASA/SDO (AIA)",
      "lic": "Public domain",
-     "page": "https://commons.wikimedia.org/wiki/File:The_Sun_by_the_Atmospheric_Imaging_Assembly_of_NASA%27s_Solar_Dynamics_Observatory_-_20100819.jpg"
+     "page": "https://commons.wikimedia.org/wiki/File:The_Sun_by_the_Atmospheric_Imaging_Assembly_of_NASA%27s_Solar_Dynamics_Observatory_-_20100819.jpg",
+     "orig": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b4/The_Sun_by_the_Atmospheric_Imaging_Assembly_of_NASA%27s_Solar_Dynamics_Observatory_-_20100819.jpg/960px-The_Sun_by_the_Atmospheric_Imaging_Assembly_of_NASA%27s_Solar_Dynamics_Observatory_-_20100819.jpg"
     }
    },
    {
@@ -635,10 +659,11 @@ export const BUILTIN = [
     ],
     "t": 15,
     "img": {
-     "src": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/32/In_the_photo_there_is_one_Perseid%2C_Milky_Way_and_Andromega_galaxy_and_light_pollution_on_the_horizon_-_Luhasoo_bog_in_Estonia.jpg/960px-In_the_photo_there_is_one_Perseid%2C_Milky_Way_and_Andromega_galaxy_and_light_pollution_on_the_horizon_-_Luhasoo_bog_in_Estonia.jpg",
+     "src": "img/ex/In_the_photo_there_is_one_Perseid2C_Milky_Way_and_Andromega.jpg",
      "credit": "Martin Mark",
      "lic": "CC BY-SA 4.0",
-     "page": "https://commons.wikimedia.org/wiki/File:In_the_photo_there_is_one_Perseid,_Milky_Way_and_Andromega_galaxy_and_light_pollution_on_the_horizon_-_Luhasoo_bog_in_Estonia.jpg"
+     "page": "https://commons.wikimedia.org/wiki/File:In_the_photo_there_is_one_Perseid,_Milky_Way_and_Andromega_galaxy_and_light_pollution_on_the_horizon_-_Luhasoo_bog_in_Estonia.jpg",
+     "orig": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/32/In_the_photo_there_is_one_Perseid%2C_Milky_Way_and_Andromega_galaxy_and_light_pollution_on_the_horizon_-_Luhasoo_bog_in_Estonia.jpg/960px-In_the_photo_there_is_one_Perseid%2C_Milky_Way_and_Andromega_galaxy_and_light_pollution_on_the_horizon_-_Luhasoo_bog_in_Estonia.jpg"
     }
    },
    {
@@ -654,10 +679,11 @@ export const BUILTIN = [
     ],
     "t": 20,
     "img": {
-     "src": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a6/Night_sky_over_the_McMath-Pierce_Solar_Telescope_%28noirlab-img-1859%29.jpg/960px-Night_sky_over_the_McMath-Pierce_Solar_Telescope_%28noirlab-img-1859%29.jpg",
+     "src": "img/ex/Night_sky_over_the_McMath-Pierce_Solar_Telescope_28noirlab-.jpg",
      "credit": "KPNO/NOIRLab/NSF/AURA/P. Marenfeld",
      "lic": "CC BY 4.0",
-     "page": "https://commons.wikimedia.org/wiki/File:Night_sky_over_the_McMath-Pierce_Solar_Telescope_(noirlab-img-1859).jpg"
+     "page": "https://commons.wikimedia.org/wiki/File:Night_sky_over_the_McMath-Pierce_Solar_Telescope_(noirlab-img-1859).jpg",
+     "orig": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a6/Night_sky_over_the_McMath-Pierce_Solar_Telescope_%28noirlab-img-1859%29.jpg/960px-Night_sky_over_the_McMath-Pierce_Solar_Telescope_%28noirlab-img-1859%29.jpg"
     }
    },
    {
@@ -673,10 +699,11 @@ export const BUILTIN = [
     ],
     "t": 20,
     "img": {
-     "src": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/61/Blue_Marble_Western_Hemisphere.jpg/960px-Blue_Marble_Western_Hemisphere.jpg",
+     "src": "img/ex/Blue_Marble_Western_Hemisphere.jpg",
      "credit": "NASA / Reto Stöckli",
      "lic": "Public domain",
-     "page": "https://commons.wikimedia.org/wiki/File:Blue_Marble_Western_Hemisphere.jpg"
+     "page": "https://commons.wikimedia.org/wiki/File:Blue_Marble_Western_Hemisphere.jpg",
+     "orig": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/61/Blue_Marble_Western_Hemisphere.jpg/960px-Blue_Marble_Western_Hemisphere.jpg"
     }
    },
    {
@@ -705,10 +732,11 @@ export const BUILTIN = [
     ],
     "t": 15,
     "img": {
-     "src": "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f2/Sunrise_over_the_Black_Sea.jpg/960px-Sunrise_over_the_Black_Sea.jpg",
+     "src": "img/ex/Sunrise_over_the_Black_Sea.jpg",
      "credit": "Alexandru Panoiu",
      "lic": "CC BY 2.0",
-     "page": "https://commons.wikimedia.org/wiki/File:Sunrise_over_the_Black_Sea.jpg"
+     "page": "https://commons.wikimedia.org/wiki/File:Sunrise_over_the_Black_Sea.jpg",
+     "orig": "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f2/Sunrise_over_the_Black_Sea.jpg/960px-Sunrise_over_the_Black_Sea.jpg"
     }
    },
    {
@@ -738,10 +766,11 @@ export const BUILTIN = [
     ],
     "t": 15,
     "img": {
-     "src": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3c/Sun_-_August_1%2C_2010.jpg/960px-Sun_-_August_1%2C_2010.jpg",
+     "src": "img/ex/Sun_-_August_12C_2010.jpg",
      "credit": "NASA/SDO/AIA",
      "lic": "Public domain",
-     "page": "https://commons.wikimedia.org/wiki/File:Sun_-_August_1,_2010.jpg"
+     "page": "https://commons.wikimedia.org/wiki/File:Sun_-_August_1,_2010.jpg",
+     "orig": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3c/Sun_-_August_1%2C_2010.jpg/960px-Sun_-_August_1%2C_2010.jpg"
     }
    }
   ]
