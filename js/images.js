@@ -13,7 +13,12 @@ export async function commonsSearch(query, limit = 12) {
     prop: 'imageinfo', iiprop: 'url|extmetadata|size', iiextmetadatafilter: 'Artist|LicenseShortName', iiurlwidth: '800',
     format: 'json', origin: '*',
   });
-  const res = await fetch(API + '?' + p.toString());
+  let res;
+  for (let a = 0; a < 3; a++) {
+    res = await fetch(API + '?' + p.toString(), { headers: { 'Api-User-Agent': 'KlassequizArena/1.0 (https://github.com/JuNNeZ/klassequiz-arena)' } });
+    if (res.status !== 429) break;
+    await new Promise(r => setTimeout(r, 1500 * (a + 1)));
+  }
   if (!res.ok) throw new Error('Søgningen fejlede (' + res.status + ')');
   const d = await res.json();
   const pages = Object.values((d.query && d.query.pages) || {}).sort((a, b) => (a.index || 0) - (b.index || 0));
@@ -137,5 +142,5 @@ export function initImagePicker() {
 export function imgHTML(img, cls = '') {
   if (!img || !img.src) return '';
   const credit = img.credit ? `<figcaption>${img.page ? `<a href="${esc(img.page)}" target="_blank" rel="noopener">` : ''}${esc(img.credit)}${img.lic ? ' · ' + esc(img.lic) : ''}${img.page ? '</a>' : ''}</figcaption>` : '';
-  return `<figure class="qimg ${cls}"><img src="${esc(img.src)}" alt="" decoding="async">${credit}</figure>`;
+  return `<figure class="qimg ${cls}"><img src="${esc(img.src)}" alt="" decoding="async" onerror="this.closest('figure').hidden=true">${credit}</figure>`;
 }
