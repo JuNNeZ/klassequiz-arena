@@ -2,6 +2,7 @@
 import { $$, esc, SFX } from './util.js';
 import { MODES, TEAMS, prepQuestions, correctIdx, rollChest, rollFish, raceGoal, fmtKg } from './modes.js';
 import { tilesHTML, questionHTML, lbHTML, podiumHTML, chestsHTML, raceHTML, catchHTML } from './ui.js';
+import { music } from './music.js';
 import { stage, enterGame, exitGame, setTimer, setNext, setCount, setStatus, body, teamStrip } from './stage.js';
 
 let G = null;
@@ -18,6 +19,7 @@ export function startBoard(quiz, o, onAgain) {
   };
   enterGame(G, quiz.title);
   G.quit = exitGame;
+  music.play(o.mode);
   nextQ();
 }
 
@@ -103,7 +105,7 @@ function fish(list) {
 function after() { G.qi >= G.qs.length - 1 ? end() : nextQ(); }
 
 function end() {
-  G.phase = 'end'; setTimer(0); SFX.end(); setCount('Slut'); setStatus('');
+  G.phase = 'end'; setTimer(0); music.stop(); SFX.end(); setCount('Slut'); setStatus('');
   let html;
   const kg = G.mode === 'fish';
   if (G.teams.length) {

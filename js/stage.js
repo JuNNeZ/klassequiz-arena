@@ -1,6 +1,7 @@
 // Fælles spilscene for tavle og værtsskærm: timer, "videre"-knap, afslut.
 import { $, $$, SFX, wakeLock, confirmClick } from './util.js';
 import { teamStripHTML } from './ui.js';
+import { music } from './music.js';
 
 export const stage = { G: null, onExit: null };
 let TICK = 0;
@@ -28,7 +29,7 @@ export function exitGame() {
   clearInterval(TICK);
   const G = stage.G; stage.G = null;
   if (G && G.cleanup) G.cleanup();
-  wakeLock(false);
+  wakeLock(false); music.stop();
   if (stage.onExit) stage.onExit();
 }
 
@@ -68,6 +69,9 @@ export function initStage() {
     }
   });
   $('#g-quit').onclick = () => confirmClick($('#g-quit'), 'Tryk igen for at afslutte', () => { const G = stage.G; if (G && G.quit) G.quit(); else exitGame(); });
+  const mb = $('#g-music');
+  const setMb = () => { mb.textContent = 'Musik: ' + (music.on ? 'til' : 'fra'); mb.setAttribute('aria-pressed', String(music.on)); };
+  setMb(); mb.onclick = () => { music.setOn(!music.on); setMb(); };
   $('#g-full').onclick = () => {
     try { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen(); } catch (e) { /* ikke understøttet */ }
   };

@@ -2,6 +2,8 @@
 import { esc, LET, fmt } from './util.js';
 import { imgHTML } from './images.js';
 import { SLOTS, PATH_LEN, TOWERS, fmtKg } from './modes.js';
+import { avatarSVG } from './avatars.js';
+const avOr = (r, size) => r.av != null ? avatarSVG(r.av, size) : '';
 
 export function tilesHTML(opts, st = {}) {
   const tag = st.buttons ? 'button' : 'div';
@@ -23,12 +25,12 @@ export function questionHTML(text, { img, multi, size = 'stage', pop = false } =
 
 export function lbHTML(rows, { unit = '', kg = false } = {}) {
   const max = Math.max(1, ...rows.map(r => r.v));
-  return '<div class="lb">' + rows.map((r, i) => `<div class="lb-row${r.me ? ' me' : ''}"><span class="bar" style="width:${Math.max(0, r.v) / max * 100}%"></span><span class="rk">${i + 1}</span><span class="nm">${r.dot ? `<i class="dot" style="background:${r.dot}"></i>` : ''}${esc(r.n)}${r.sub ? ` <span class="sub">${esc(r.sub)}</span>` : ''}</span><span class="vl">${kg ? fmtKg(r.v) : fmt(r.v)}${unit ? ' ' + unit : ''}</span></div>`).join('') + '</div>';
+  return '<div class="lb">' + rows.map((r, i) => `<div class="lb-row${r.me ? ' me' : ''}"><span class="bar" style="width:${Math.max(0, r.v) / max * 100}%"></span><span class="rk">${i + 1}</span><span class="nm">${r.dot ? `<i class="dot" style="background:${r.dot}"></i>` : ''}${avOr(r, 30)}${esc(r.n)}${r.sub ? ` <span class="sub">${esc(r.sub)}</span>` : ''}</span><span class="vl">${kg ? fmtKg(r.v) : fmt(r.v)}${unit ? ' ' + unit : ''}</span></div>`).join('') + '</div>';
 }
 
 export function podiumHTML(rows, { unit = '', kg = false } = {}) {
   const top = rows.slice(0, 3), order = [1, 0, 2].filter(i => top[i]), hgt = [150, 110, 80];
-  return '<div class="podium">' + order.map(i => `<div class="pod"><span class="nm">${esc(top[i].n)}</span><span class="vl">${kg ? fmtKg(top[i].v) : fmt(top[i].v)}${unit ? ' ' + unit : ''}</span><div class="blk" style="height:${hgt[i]}px">${i + 1}</div></div>`).join('') + '</div>';
+  return '<div class="podium">' + order.map(i => `<div class="pod">${avOr(top[i], i === 0 ? 72 : 56)}<span class="nm">${esc(top[i].n)}</span><span class="vl">${kg ? fmtKg(top[i].v) : fmt(top[i].v)}${unit ? ' ' + unit : ''}</span><div class="blk" style="height:${hgt[i]}px">${i + 1}</div></div>`).join('') + '</div>';
 }
 
 export function teamStripHTML(teams, unit = '', kg = false) {
@@ -54,7 +56,7 @@ const RUN_C = ['var(--a)', 'var(--b)', 'var(--c)', 'var(--d)', 'var(--good)', 'v
 export function raceHTML(rows, goal) {
   return `<div class="race"><div class="race-head"><span>Start</span><span>Mål · ${goal} felter</span></div>` + rows.map((r, i) => {
     const pct = Math.min(100, r.pos / goal * 100);
-    return `<div class="lane${r.me ? ' me' : ''}"><span class="lane-n">${esc(r.n)}</span><div class="lane-track"><span class="runner" style="left:calc(${pct}% - ${pct / 100 * 30}px);background:${r.dot || RUN_C[[...(r.n || '')].reduce((h, c) => h + c.charCodeAt(0), 0) % RUN_C.length]}">${esc((r.n || '?').trim().charAt(0).toUpperCase())}</span></div></div>`;
+    return `<div class="lane${r.me ? ' me' : ''}"><span class="lane-n">${esc(r.n)}</span><div class="lane-track">${r.av != null ? `<span class="runner av-run" style="left:calc(${pct}% - ${pct / 100 * 34}px)">${avatarSVG(r.av, 34)}</span>` : `<span class="runner" style="left:calc(${pct}% - ${pct / 100 * 30}px);background:${r.dot || RUN_C[[...(r.n || '')].reduce((h, c) => h + c.charCodeAt(0), 0) % RUN_C.length]}">${esc((r.n || '?').trim().charAt(0).toUpperCase())}</span>`}</div></div>`;
   }).join('') + '</div>';
 }
 

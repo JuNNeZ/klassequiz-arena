@@ -44,7 +44,7 @@
     <div class="grid" id="lib-grid"></div>
     <div class="howto">
       <div><h3>Tavle</h3><p>Én skærm på projektoren. Klassen svarer højt eller på hold, og du giver point med et klik. Mellemrum går videre.</p></div>
-      <div><h3>Live</h3><p>Du får en firecifret kode og en QR-kode. Eleverne svarer på iPad eller telefon. Intet login, kun et kaldenavn.</p></div>
+      <div><h3>Live</h3><p>Du får en kode og en QR-kode. Hver elev spiller i eget tempo på sin egen enhed, og tavlen viser den samlede stilling. Intet login.</p></div>
       <div><h3>Øv selv</h3><p>Del et øvelink til lektier. Eleven får svar med det samme og kan øve de forkerte igen.</p></div>
     </div>
   </section>
@@ -80,6 +80,7 @@
       <div class="prog"><b id="g-title"></b><span class="muted num" id="g-count"></span></div>
       <div class="teamstrip" id="g-teams"></div>
       <div class="timer" id="g-timer" hidden><span id="g-time">20</span></div>
+      <button class="btn ghost" id="g-music" type="button" aria-pressed="true">Musik: til</button>
       <button class="btn ghost" id="g-full" type="button" title="Fuld skærm">Fuld skærm</button>
       <button class="btn ghost" id="g-quit" type="button">Afslut</button>
     </div>
@@ -136,7 +137,9 @@
         <label id="teams-wrap" for="o-teams">Antal hold
           <select id="o-teams"><option>2</option><option selected>3</option><option>4</option><option>5</option><option>6</option></select></label>
         <label id="timer-wrap"><input type="checkbox" id="o-timer" checked> Nedtælling</label>
-        <label><input type="checkbox" id="o-shufq"> Bland spørgsmål</label>
+        <label id="len-wrap" for="o-len">Spillets længde
+          <select id="o-len"><option value="3">3 min</option><option value="5" selected>5 min</option><option value="8">8 min</option><option value="10">10 min</option><option value="15">15 min</option><option value="0">Til jeg stopper</option></select></label>
+        <label id="shufq-wrap"><input type="checkbox" id="o-shufq"> Bland spørgsmål</label>
         <label><input type="checkbox" id="o-shufa"> Bland svar</label>
       </div>
     </fieldset>

@@ -1,12 +1,13 @@
-// ELEV: deltag med kode og navn. Ingen login.
+// ELEV: deltag med kode og navn, vælg figur, spil i eget tempo. Ingen login.
 import { $, $$, esc, SFX, cleanName, lsGet, lsSet, fmt } from './util.js';
 import { TEAMS, MODES, TOWERS, TOWER_TYPES, MAX_LVL, upgradeCost, towerSpent, simWave, fmtKg } from './modes.js';
 import { tilesHTML, questionHTML, chestsHTML, catchHTML, drawTowerField, slotAt } from './ui.js';
+import { avatarSVG, avatarName, AVATAR_COUNT } from './avatars.js';
 import { Client, p2pAvailable } from './net.js';
-import { startSelf, SS, stopSelf } from './self.js';
 
 export let P = null;
-let PT = 0, anim = 0;
+let autoT = 0, clockT = 0, anim = 0;
+const ROBOT_AV = 16;
 
 function sid() {
   try { let s = sessionStorage.getItem('kqa.sid'); if (!s) { s = 's' + Math.random().toString(36).slice(2, 12); sessionStorage.setItem('kqa.sid', s); } return s; }
@@ -31,232 +32,288 @@ function join() {
   if (!p2pAvailable()) { err.textContent = 'Siden kunne ikke indlæse forbindelsen. Genindlæs siden.'; err.hidden = false; return; }
   if (typeof window.RTCPeerConnection !== 'function') { err.textContent = 'Live-spil er slået fra i browseren på denne computer (WebRTC er blokeret). Brug en anden enhed, eller spørg IT.'; err.hidden = false; return; }
   lsSet('kqa.name', name);
-  P = { code, name, sid: sid(), s: null, status: 'connecting', answered: {}, shown: {}, picked: {}, seen: {}, towers: [], buildWave: 0, sel: -1, animWave: 0, self: null };
+  let av = lsGet('kqa.av', null);
+  if (!Number.isInteger(av)) av = Math.floor(Math.random() * AVATAR_COUNT);
+  P = { code, name, sid: sid(), av, status: 'connecting', diag: null, s: null, me: null, meAt: 0, rank: 0, q: null, view: 'wait', res: null, banner: null, towers: [], sel: 0 };
   P.client = new Client(code, {
-    onData: onData,
+    onData,
     onStatus: (st, diag) => {
       if (!P) return;
       P.status = st; P.diag = diag;
-      if (st === 'open') P.client.send({ t: 'hello', sid: P.sid, nm: P.name });
-      render();
+      if (st === 'open') P.client.send({ t: 'hello', sid: P.sid, nm: P.name, av: P.av });
+      if (!P.s || st === 'lost') render();
     },
   });
-  $('#join-form').hidden = true; $('#play').hidden = false; document.body.classList.add('in-game'); render();
+  $('#join-form').hidden = true; $('#play').hidden = false; document.body.classList.add('in-game');
+  clearInterval(clockT); clockT = setInterval(clock, 500);
+  render();
 }
 
 export function leave() {
   if (!P) return;
   try { P.client.close(); } catch (e) { /* */ }
-  P = null; stopSelf(); clearInterval(PT); cancelAnimationFrame(anim);
+  P = null; clearTimeout(autoT); clearInterval(clockT); cancelAnimationFrame(anim);
   $('#play').hidden = true; $('#play').innerHTML = ''; $('#join-form').hidden = false; document.body.classList.remove('in-game');
 }
 
+/* ---------- beskeder fra læreren ---------- */
 function onData(d) {
   if (!P || !d || typeof d !== 'object') return;
-  if (d.t === 'kicked') { P.kicked = true; render(); return; }
-  if (d.t === 'state') {
-    if (d.self) P.self = d.self;
-    P.s = d; render();
+  if (d.me) { P.me = d.me; P.meAt = Date.now(); }
+  if (d.rank) P.rank = d.rank;
+  switch (d.t) {
+    case 'kicked': P.kicked = true; break;
+    case 'state': {
+      const was = P.s && P.s.phase;
+      P.s = d;
+      if (d.left != null) P.endAt = Date.now() + d.left;
+      if (d.me && Number.isInteger(d.me.av)) P.av = d.me.av;
+      if (d.phase === 'play' && was === 'play') { if (!P.building && !P.wave) refreshTop(); return; }
+      if (d.phase === 'end' && was !== 'end') { SFX.end(); P.building = false; P.wave = null; }
+      break;
+    }
+    case 'q': P.q = { n: d.n, ...d.q, t0: performance.now() }; P.view = 'q'; break;
+    case 'res':
+      if (!P.q || d.n !== P.q.n) return;
+      P.res = d; (d.ok ? SFX.good : SFX.bad)();
+      if (d.ok && d.fx && d.fx.chest) P.view = 'chest';
+      else if (d.ok && d.fx && d.fx.fish) { P.view = 'cast'; setTimeout(() => { if (P && P.view === 'cast') { P.view = 'res'; SFX.splash(); render(); auto(2200); } }, 1100); }
+      else { P.view = 'res'; auto(d.ok ? 1300 : 2600); }
+      break;
+    case 'chestres':
+      P.chest = d; P.view = 'chestres'; (d.d >= 0 ? SFX.coin : SFX.bad)(); auto(1900); break;
+    case 'note': banner(d.txt, 'bad'); refreshTop(); return;
+    case 'duel':
+      if (d.ev === 'hit') banner(`${d.by} ramte dig for ${d.dmg}!`, 'bad');
+      else if (d.ev === 'won') { banner(`Du vandt duellen mod ${d.vs}!`, 'good'); SFX.end(); }
+      else if (d.ev === 'lost') banner(`${d.by} vandt duellen. Ny modstander kommer!`, 'bad');
+      else if (d.ev === 'new') banner('Ny modstander: ' + ((d.me && d.me.duel && d.me.duel.opp && d.me.duel.opp.nm) || '?'), '');
+      refreshTop(); return;
+    case 'wave':
+      P.wave = { w: d.w, towers: d.towers, res: d.res, done: false };
+      if (P.q && P.view === 'q' && !P.q.pausedAt) P.q.pausedAt = performance.now();
+      P.building = false; clearTimeout(autoT); startWave(); return;
+    case 'done': P.view = 'done'; break;
+    default: return;
   }
+  render();
 }
 
+function auto(ms) { clearTimeout(autoT); autoT = setTimeout(nextQ, ms); }
+function nextQ() {
+  clearTimeout(autoT);
+  if (!P || !['res', 'chestres'].includes(P.view)) return;
+  if (P.wave) return; // fortsæt efter bølgen
+  P.view = 'wait'; P.q = null; P.client.send({ t: 'next' }); render();
+}
+function banner(txt, cls) {
+  if (!P) return;
+  P.banner = { txt, cls, until: Date.now() + 2600 };
+  const b = $('#p-banner'); if (b) { b.textContent = txt; b.className = 'p-banner pop ' + (cls || ''); b.hidden = false; }
+}
+function clock() {
+  if (!P) return;
+  const b = $('#p-banner');
+  if (b && P.banner) { if (Date.now() > P.banner.until) { b.hidden = true; P.banner = null; } else if (b.hidden) { b.textContent = P.banner.txt; b.className = 'p-banner ' + (P.banner.cls || ''); b.hidden = false; } }
+  const c = $('#p-clock');
+  if (c && P.endAt) { const s = Math.max(0, Math.ceil((P.endAt - Date.now()) / 1000)); c.textContent = Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
+  const w = $('#p-nextwave');
+  if (w && P.me && P.me.nextWave != null) { const s = Math.max(0, Math.ceil((P.me.nextWave - (Date.now() - P.meAt)) / 1000)); w.textContent = s ? `Næste bølge om ${s} s` : 'Bølgen kommer!'; }
+}
+
+/* ---------- visning ---------- */
+const root = () => $('#play');
 function diagHTML() {
   const d = P && P.diag; if (!d) return '';
   const mark = v => v === 'ok' ? '<b class="ok-c">✓</b>' : v === 'fail' ? '<b class="bad-c">✕</b>' : '<span class="muted">…</span>';
   return `<ul class="diag"><li>${mark(d.server)} Forbindelse til netværket</li><li>${mark(d.host)} Forbindelse til lærerens skærm${d.tries > 1 ? ` · forsøg ${d.tries}` : ''}${d.relay ? ' · via relæ' : ''}</li></ul>`;
 }
 function msg(h, p, cls, withDiag) {
-  $('#play').innerHTML = `<div class="state ${cls || ''}"><h2>${esc(h)}</h2>${p ? `<p class="muted">${esc(p)}</p>` : ''}${withDiag ? diagHTML() : ''}</div><div class="row center-row"><button class="btn ghost" id="p-leave" type="button">Forlad spillet</button></div>`;
+  root().innerHTML = `<div class="state ${cls || ''}"><h2>${esc(h)}</h2>${p ? `<p class="muted">${esc(p)}</p>` : ''}${withDiag ? diagHTML() : ''}</div><div class="row center-row"><button class="btn ghost" id="p-leave" type="button">Forlad spillet</button></div>`;
   $('#p-leave').onclick = leave;
 }
-function meBar(s) {
-  const me = s.me;
-  const team = me.team >= 0 && s.teams && s.teams[me.team] ? `<span class="badge"><i style="background:${TEAMS[me.team].c}"></i>Hold ${esc(s.teams[me.team].n)}</span>` : '';
-  let v = '';
-  if (s.mode === 'race') v = `Felt ${me.pos} af ${s.goal}`;
-  else if (s.mode === 'fish') v = fmtKg(me.kg) + ' kg';
-  else if (s.mode === 'tower') v = `${s.coins} mønter · ${me.hp} ♥`;
-  else if (s.mode === 'gold') v = fmt(me.score) + ' guld';
-  else if (s.mode !== 'self') v = fmt(me.score) + ' point';
-  return `<div class="me-bar"><span><b>${esc(P.name)}</b> ${team}</span><span class="num">${v}</span></div>`;
+function statLine(me, mode, s) {
+  if (!me) return '';
+  if (mode === 'race') return `Felt ${me.pos} af ${s.goal}`;
+  if (mode === 'fish') return fmtKg(me.kg) + ' kg';
+  if (mode === 'tower') return `${me.coins} mønter · ${me.hp} ♥`;
+  if (mode === 'gold') return fmt(me.score) + ' guld';
+  if (mode === 'duel') return `${me.wins} ${me.wins === 1 ? 'sejr' : 'sejre'}`;
+  if (mode === 'self') return `${me.correct} rigtige`;
+  return fmt(me.score) + ' point';
+}
+function topHTML() {
+  const s = P.s, me = P.me || {};
+  const team = me.team >= 0 && s.teams && s.teams[me.team] ? `<span class="badge"><i style="background:${TEAMS[me.team].c}"></i>${esc(s.teams[me.team].n)}</span>` : '';
+  const lost = P.status === 'lost' ? '<p class="note">Forbindelsen er tabt. Prøver igen…</p>' : '';
+  return `<div class="me-bar" id="p-top"><span>${avatarSVG(P.av, 28)}<b>${esc(P.name)}</b> ${team}</span><span class="num">${statLine(me, s.mode, s)}${P.rank && s.phase === 'play' && s.mode !== 'self' ? ` · <b>nr. ${P.rank}</b>` : ''}${P.endAt && s.phase === 'play' ? ` · <span id="p-clock"></span>` : ''}</span></div>${duelHTML()}${lost}<div id="p-banner" class="p-banner" hidden></div>`;
+}
+function refreshTop() {
+  const t = $('#p-top'); if (!t) return;
+  const tmp = document.createElement('div'); tmp.innerHTML = topHTML();
+  t.replaceWith(tmp.querySelector('#p-top'));
+  const dv = $('#p-duel'), ndv = tmp.querySelector('#p-duel');
+  if (dv && ndv) dv.replaceWith(ndv); else if (!dv && ndv) $('#p-top').after(ndv);
+  const bb = $('#p-build'); if (bb && P.me) bb.textContent = `Byg tårne · ${P.me.coins} mønter`;
+  clock();
+}
+function duelHTML() {
+  if (!P.s || P.s.mode !== 'duel' || P.s.phase !== 'play') return '';
+  const d = P.me && P.me.duel; if (!d || !d.opp) return '<div class="duel" id="p-duel"><p class="muted center">Finder en modstander…</p></div>';
+  const bar = (hp, max) => `<span class="hp"><i style="width:${Math.max(0, hp) / max * 100}%"></i></span>`;
+  return `<div class="duel" id="p-duel"><div class="dside">${avatarSVG(P.av, 34)}<span><b>Dig</b>${bar(d.hp, d.max)}</span></div><span class="vs">mod</span><div class="dside r"><span><b>${esc(d.opp.nm)}</b>${bar(d.opp.hp, d.max)}</span>${avatarSVG(d.opp.av != null ? d.opp.av : ROBOT_AV, 34)}</div></div>`;
 }
 
 function render() {
   if (!P) return;
-  clearInterval(PT);
-  const s = P.s;
+  cancelAnimationFrame(anim);
   if (P.kicked) return msg('Du er taget ud af spillet', 'Spørg din lærer, hvis det er en fejl.', 'bad');
+  const s = P.s;
   if (!s) {
     if (P.status === 'notfound') return msg('Leder efter spillet…', `Fandt ikke et spil med koden ${P.code}. Tjek koden på tavlen. Vi prøver igen automatisk.`, '', true);
     if (P.status === 'neterror') return msg('Forbinder…', 'Netværket driller. Vi prøver igen automatisk.', '', true);
     return msg('Forbinder…', `Kode ${P.code}`, '', true);
   }
   if (s.phase === 'closed') return msg('Spillet er slut', 'Læreren har lukket spillet. Tak for i dag!');
-  const lostNote = P.status === 'lost' ? '<p class="note">Forbindelsen er tabt. Prøver igen…</p>' : '';
-  const top = meBar(s) + lostNote;
-  const root = $('#play');
-
-  if (s.phase === 'self') {
-    if (!P.self) return msg('Henter spørgsmål…', '');
-    if (!SS || SS.root !== root || SS.code !== P.code) {
-      startSelf(root, s.title, P.self, pr => { if (P) P.client.send(Object.assign({ t: 'ss' }, pr)); }).code = P.code;
-    }
-    return;
+  if (s.phase === 'lobby' || s.phase === 'opening') return lobbyView(s);
+  if (s.phase === 'end') return endView(s);
+  if (P.wave) return; // bølgen kører
+  if (P.building) return buildView();
+  const r = root();
+  if (P.view === 'q' && P.q) return questionView();
+  if (P.view === 'chest') {
+    r.innerHTML = `${topHTML()}<div class="center"><h2 class="big-msg sm">Rigtigt! Vælg en kiste</h2>${chestsHTML(false)}</div>`;
+    $$('#play .chest').forEach(b => { b.onclick = () => { $$('#play .chest').forEach(x => { x.disabled = true; if (x !== b) x.classList.add('faded'); }); b.classList.add('open'); P.client.send({ t: 'chest', n: P.q.n, k: +b.dataset.k }); }; });
+    clock(); return;
   }
-  if (SS && SS.root === root) stopSelf();
-
-  if (s.phase === 'lobby' || s.phase === 'opening') {
-    root.innerHTML = `${top}<div class="state pop"><h2>Du er med!</h2><p class="muted">Kig op på tavlen. ${esc(MODES[s.mode].name)} starter snart.</p></div><div class="row center-row"><button class="btn ghost" id="p-leave" type="button">Forlad spillet</button></div>`;
-    $('#p-leave').onclick = leave; return;
+  if (P.view === 'chestres') {
+    const c = P.chest;
+    r.innerHTML = `${topHTML()}<div class="state ${c.d < 0 ? 'bad' : 'good'} pop"><h2>${esc(c.txt)}</h2></div><div class="row center-row"><button class="btn primary big" id="p-next" type="button">Næste</button></div>`;
+    $('#p-next').onclick = nextQ; clock(); return;
   }
-
-  if (s.phase === 'q' && s.q) {
-    if (P.answered[s.qi] != null) { root.innerHTML = `${top}<div class="state"><h2>Svar sendt</h2><p class="muted">Venter på de andre…</p></div>`; return; }
-    if (P.shown[s.qi] == null) P.shown[s.qi] = performance.now();
-    const t0 = P.shown[s.qi], dur = s.q.t * 1000;
-    const vs = s.vs ? `<p class="duel-vs">Du dyster mod <b>${esc(s.vs)}</b></p>` : '';
-    root.innerHTML = `${top}${vs}<div class="tbar"><i id="p-tb" style="width:100%"></i></div>${questionHTML(s.q.text, { img: s.q.img, multi: s.q.multi, size: 'phone' })}${tilesHTML(s.q.opts, { buttons: true })}`;
-    $$('#play .tile').forEach(b => {
-      b.onclick = () => {
-        if (P.answered[s.qi] != null) return;
-        P.answered[s.qi] = +b.dataset.i;
-        P.client.send({ t: 'ans', qi: s.qi, c: +b.dataset.i, ms: Math.round(performance.now() - t0) });
-        render();
-      };
-    });
-    PT = setInterval(() => {
-      const l = Math.max(0, 1 - (performance.now() - t0) / dur), tb = $('#p-tb');
-      if (tb) tb.style.width = (l * 100) + '%';
-      if (l <= 0) { clearInterval(PT); $$('#play .tile').forEach(b => { b.disabled = true; }); }
-    }, 200);
-    return;
+  if (P.view === 'cast') { r.innerHTML = `${topHTML()}<div class="state"><div class="cast"><span class="bob"></span></div><h2>Rigtigt! Kaster snøren…</h2></div>`; clock(); return; }
+  if (P.view === 'res') return resultView();
+  if (P.view === 'done') {
+    const me = P.me || {};
+    r.innerHTML = `${topHTML()}<div class="state good pop"><h2>Du har klaret alle spørgsmål!</h2><p>${me.correct} rigtige ud af ${me.answered} svar.</p><p class="muted">Kig op på tavlen.</p></div>`; return;
   }
-
-  if (s.phase === 'chest' && s.eligible) {
-    if (P.picked[s.qi] != null) { root.innerHTML = `${top}<div class="state"><h2>Kiste valgt</h2><p class="muted">Kig op på tavlen…</p></div>`; return; }
-    root.innerHTML = `${top}<div class="center"><h2 class="big-msg">Vælg en kiste!</h2>${chestsHTML(false)}</div>`;
-    $$('#play .chest').forEach(b => { b.onclick = () => { P.picked[s.qi] = +b.dataset.k; b.classList.add('open'); P.client.send({ t: 'chest', qi: s.qi, k: +b.dataset.k }); setTimeout(render, 500); }; });
-    return;
-  }
-
-  if (s.phase === 'build') return buildView(s, top);
-  if (s.phase === 'wave') return waveView(s, top);
-
-  if (['reveal', 'chest', 'chestres', 'catch'].includes(s.phase)) return resultView(s, top);
-
-  if (s.phase === 'board' || s.phase === 'end') {
-    const end = s.phase === 'end', me = s.me;
-    let line = '';
-    if (s.mode === 'race') line = `Du er på felt ${me.pos} af ${s.goal}.`;
-    else if (s.mode === 'fish') line = `Din fangst vejer ${fmtKg(me.kg)} kg.`;
-    else if (s.mode === 'tower') line = `${me.kills} monstre stoppet · borgen har ${me.hp} ♥ · ${fmt(me.score)} point.`;
-    else if (s.mode === 'duel') line = `${me.wins} sejre · ${fmt(me.score)} point.`;
-    else line = `${fmt(me.score)} ${s.mode === 'gold' ? 'guld' : 'point'}.`;
-    let teamLine = '';
-    if (s.teams && me.team >= 0) { const ts = s.teams.map((t, i) => ({ i, v: t.score })).sort((a, b) => b.v - a.v); teamLine = `<p>Hold ${esc(s.teams[me.team].n)} er nr. ${ts.findIndex(x => x.i === me.team) + 1} af ${s.teams.length}</p>`; }
-    const vk = s.phase + s.qi;
-    root.innerHTML = `${top}<div class="state ${end && s.rank === 1 ? 'good' : ''} pop"><h2>${end ? (s.rank === 1 ? 'Du vandt!' : 'Godt spillet!') : 'Stillingen'}</h2><p>Du er nr. <b>${s.rank}</b> af ${s.n}</p><p class="muted">${esc(line)}</p>${teamLine}</div>${end ? '<div class="row center-row"><button class="btn" id="p-leave" type="button">Forlad spillet</button></div>' : ''}`;
-    if (end) { $('#p-leave').onclick = leave; if (!P.seen[vk]) { P.seen[vk] = 1; SFX.end(); } }
-    return;
-  }
-  msg('Venter…', '');
+  r.innerHTML = `${topHTML()}<div class="state"><h2>Henter spørgsmål…</h2></div>`;
 }
 
-function resultView(s, top) {
-  const root = $('#play'), me = s.me, last = me.last || {};
-  const correct = (s.correct || []).map(i => s.q && s.q.opts[i]).filter(Boolean);
-  const answerLine = correct.length ? `<p class="muted">Rigtigt svar: <b>${correct.map(esc).join(' / ')}</b></p>` : '';
-  const vk = 'r' + s.qi + s.phase;
-  const first = !P.seen[vk]; P.seen[vk] = 1;
-  let cls = last.ok ? 'good' : 'bad', h = last.ok ? 'Rigtigt!' : last.none ? 'Du nåede ikke at svare' : 'Forkert', p = '';
-  let extra = '';
-  if (s.mode === 'classic' || s.mode === 'team') { if (last.ok) p = `+${fmt(last.pts)} point`; }
-  else if (s.mode === 'gold') {
-    if (s.phase === 'chestres' && last.txt) { h = last.txt; cls = last.pts < 0 ? 'bad' : 'good'; }
-    else if (last.ok) p = s.phase === 'chest' ? 'Kisterne åbnes…' : 'Du får en kiste.';
-    else if (s.phase === 'chest') p = 'Andre åbner kister…';
-  }
-  else if (s.mode === 'race') { if (last.ok) p = `+${last.steps} felter`; extra = `<div class="mini-race"><i style="width:${Math.min(100, me.pos / s.goal * 100)}%"></i></div><p class="muted center">Felt ${me.pos} af ${s.goal}</p>`; }
-  else if (s.mode === 'tower') { if (last.ok) p = `+${last.coins} mønter`; else p = 'Ingen mønter denne gang.'; }
-  else if (s.mode === 'duel' && last.duel) {
-    if (last.duel === 'win') { h = `Du vandt over ${last.vs}!`; cls = 'good'; }
-    else if (last.duel === 'draw') { h = `Uafgjort mod ${last.vs}`; cls = ''; }
-    else { h = `${last.vs} vandt duellen`; cls = 'bad'; }
-    p = (last.ok ? 'Dit svar var rigtigt. ' : '') + (last.pts ? `+${last.pts} point` : '');
-  }
-  if (last.hit) p = (p ? p + ' · ' : '') + last.hit;
-  if (s.mode === 'fish' && last.ok && last.fish) {
-    if (first) {
-      root.innerHTML = `${top}<div class="state"><div class="cast"><span class="bob"></span></div><h2>Kaster snøren…</h2></div>`;
-      setTimeout(() => { if (P && P.s === s) { P.seen[vk] = 2; resultView(s, top); SFX.splash(); } }, 1400);
-      return;
-    }
-    root.innerHTML = `${top}<div class="state good">${catchHTML(last.fish)}<p>Din samlede fangst: <b>${fmtKg(me.kg)} kg</b></p></div>${answerLine}`;
-    return;
-  }
-  root.innerHTML = `${top}<div class="state ${cls} pop"><h2>${esc(h)}</h2>${p ? `<p>${esc(p)}</p>` : ''}${answerLine}</div>${extra}`;
-  if (first && s.phase === 'reveal') (last.ok ? SFX.good : SFX.bad)();
-  if (first && s.phase === 'chestres' && last.txt) (last.pts >= 0 ? SFX.coin : SFX.bad)();
+function lobbyView(s) {
+  const r = root();
+  r.innerHTML = `<div class="state pop"><div class="lobby-av">${avatarSVG(P.av, 96)}</div><h2>Du er med, ${esc(P.name)}!</h2><p class="muted">${esc(MODES[s.mode].name)} starter, når læreren trykker start. Vælg din figur imens.</p></div>
+    <div class="av-pick" role="group" aria-label="Vælg figur">${Array.from({ length: AVATAR_COUNT }, (_, i) => `<button class="av-b" type="button" data-av="${i}" aria-pressed="${i === P.av}" aria-label="${esc(avatarName(i))}">${avatarSVG(i, 56)}</button>`).join('')}</div>
+    <div class="row center-row"><button class="btn ghost" id="p-leave" type="button">Forlad spillet</button></div>`;
+  $$('#play .av-b').forEach(b => { b.onclick = () => { P.av = +b.dataset.av; lsSet('kqa.av', P.av); P.client.send({ t: 'av', av: P.av }); SFX.join(); lobbyView(s); }; });
+  $('#p-leave').onclick = leave;
 }
 
-/* Tårnforsvar: byg */
-function buildView(s, top) {
-  if (P.buildWave !== s.wave) { P.buildWave = s.wave; P.towers = (s.towers || []).map(t => ({ ...t })); P.sel = P.towers.length < 5 ? [0, 1, 2, 3, 4].find(i => !P.towers.some(t => t.slot === i)) : 0; P.ready = false; }
-  const root = $('#play');
-  const coins = (s.earned || 0) - towerSpent(P.towers);
+function questionView() {
+  const q = P.q, s = P.s, r = root();
+  const tower = s.mode === 'tower' ? `<div class="tw-bar"><span id="p-nextwave" class="muted small"></span><button class="btn" id="p-build" type="button">Byg tårne · ${P.me ? P.me.coins : 0} mønter</button></div>` : '';
+  r.innerHTML = `${topHTML()}${tower}<div class="tbar"><i id="p-tb" style="width:100%"></i></div>${questionHTML(q.text, { img: q.img, multi: q.multi, size: 'phone' })}${tilesHTML(q.opts, { buttons: true })}`;
+  if (q.sent) $$('#play .tile').forEach(x => { x.disabled = true; });
+  $$('#play .tile').forEach(b => {
+    b.onclick = () => {
+      if (P.q.sent) return;
+      P.q.sent = true; b.classList.add('picked');
+      $$('#play .tile').forEach(x => { x.disabled = true; });
+      P.client.send({ t: 'ans', n: q.n, c: +b.dataset.i, ms: Math.round(performance.now() - q.t0) });
+    };
+  });
+  const bb = $('#p-build'); if (bb) bb.onclick = () => { P.building = true; if (!P.q.pausedAt) P.q.pausedAt = performance.now(); render(); };
+  const dur = q.t * 1000;
+  const step = () => {
+    if (!P || P.view !== 'q' || P.q !== q || P.building || P.wave) return;
+    const l = Math.max(0, 1 - (performance.now() - q.t0) / dur), tb = $('#p-tb');
+    if (tb) tb.style.width = (l * 100) + '%';
+    anim = requestAnimationFrame(step);
+  };
+  anim = requestAnimationFrame(step);
+  clock();
+}
+
+function resultView() {
+  const d = P.res, fx = d.fx || {}, s = P.s, r = root(), me = P.me || {};
+  const q = P.q;
+  const right = (d.correct || []).map(i => q && q.opts[i]).filter(Boolean);
+  let h = d.ok ? 'Rigtigt!' : 'Forkert', p = '', extra = '';
+  if (d.ok && fx.pts) p = `+${fmt(fx.pts)} point${me.streak >= 2 ? ` · stime ${me.streak}` : ''}`;
+  if (d.ok && fx.steps) { p = `+${fx.steps} ${fx.steps === 1 ? 'felt' : 'felter'}`; extra = `<div class="mini-race"><i style="width:${Math.min(100, me.pos / s.goal * 100)}%"></i></div><p class="muted center">Felt ${me.pos} af ${s.goal}</p>`; }
+  if (d.ok && fx.fish) { extra = catchHTML(fx.fish); h = fx.fish.junk ? 'Øv, en gammel støvle!' : 'Bid!'; p = `Samlet fangst: ${fmtKg(me.kg)} kg`; }
+  if (d.ok && fx.coins) p = `+${fx.coins} mønter`;
+  if (d.ok && fx.dmg) p = `Du ramte ${fx.vs} for ${fx.dmg}!`;
+  if (!d.ok && s.mode === 'self') p = 'Spørgsmålet kommer igen senere.';
+  r.innerHTML = `${topHTML()}<div class="state ${d.ok ? 'good' : 'bad'} pop"><h2>${esc(h)}</h2>${p ? `<p>${esc(p)}</p>` : ''}${extra}${!d.ok && right.length ? `<p class="muted">Rigtigt svar: <b>${right.map(esc).join(' / ')}</b></p>` : ''}</div><div class="row center-row"><button class="btn primary big" id="p-next" type="button">Næste</button></div>`;
+  $('#p-next').onclick = nextQ;
+  clock();
+}
+
+function endView(s) {
+  const me = P.me || {}, r = root();
+  let teamLine = '';
+  if (s.teams && me.team >= 0) { const ts = s.teams.map((t, i) => ({ i, v: t.score })).sort((a, b) => b.v - a.v); teamLine = `<p>Hold ${esc(s.teams[me.team].n)} blev nr. ${ts.findIndex(x => x.i === me.team) + 1} af ${s.teams.length}</p>`; }
+  r.innerHTML = `<div class="state ${s.rank === 1 && s.mode !== 'self' ? 'good' : ''} pop"><div class="lobby-av">${avatarSVG(P.av, 96)}</div><h2>${s.mode === 'self' ? 'Godt arbejde!' : s.rank === 1 ? 'Du vandt!' : 'Godt spillet!'}</h2>${s.mode !== 'self' ? `<p>Du blev nr. <b>${s.rank}</b> af ${s.n}</p>` : ''}<p class="muted">${esc(statLine(me, s.mode, s))} · ${me.correct}/${me.answered} rigtige svar</p>${teamLine}</div><div class="row center-row"><button class="btn" id="p-leave" type="button">Forlad spillet</button></div>`;
+  $('#p-leave').onclick = leave;
+}
+
+/* ---------- Tårnforsvar ---------- */
+function buildView() {
+  const me = P.me || {}, r = root();
+  P.towers = (me.towers || []).map(t => ({ ...t }));
+  const coins = me.coins || 0;
   const t = P.towers.find(x => x.slot === P.sel);
   let shop;
-  if (P.ready) shop = '<p class="muted center">Klar! Venter på bølgen…</p>';
-  else if (!t) shop = `<div class="shop">${TOWER_TYPES.map(k => `<button class="shop-b" data-buy="${k}" type="button"${coins < TOWERS[k].cost ? ' disabled' : ''}><i style="background:${TOWERS[k].c}"></i><b>${TOWERS[k].n}</b><span>${TOWERS[k].cost} mønter</span><small>${k === 'archer' ? 'Hurtige pile' : k === 'ice' ? 'Gør monstre langsomme' : 'Stor skade, langsom'}</small></button>`).join('')}</div>`;
+  if (!t) shop = `<div class="shop">${TOWER_TYPES.map(k => `<button class="shop-b" data-buy="${k}" type="button"${coins < TOWERS[k].cost ? ' disabled' : ''}><i style="background:${TOWERS[k].c}"></i><b>${TOWERS[k].n}</b><span>${TOWERS[k].cost} mønter</span><small>${k === 'archer' ? 'Hurtige pile' : k === 'ice' ? 'Gør monstre langsomme' : 'Stor skade, langsom'}</small></button>`).join('')}</div>`;
   else {
     const up = t.lvl < MAX_LVL ? upgradeCost(t.type, t.lvl) : 0;
     shop = `<div class="shop one"><p><b>${TOWERS[t.type].n}</b> · niveau ${t.lvl}</p><div class="row center-row">${t.lvl < MAX_LVL ? `<button class="btn primary" id="tw-up" type="button"${coins < up ? ' disabled' : ''}>Opgradér · ${up} mønter</button>` : '<span class="muted">Maks niveau</span>'}<button class="btn ghost" id="tw-sell" type="button">Sælg (+${towerSpent([t])})</button></div></div>`;
   }
-  root.innerHTML = `${top}<div class="center"><h2 class="big-msg sm">Byg tårne · bølge ${s.wave}</h2><p class="coins"><b>${coins}</b> mønter</p></div>
+  r.innerHTML = `${topHTML()}<div class="center"><h2 class="big-msg sm">Byg tårne</h2><p class="coins"><b>${coins}</b> mønter · <span id="p-nextwave"></span></p></div>
     <canvas id="tw-cv" class="tw-cv" aria-label="Spillebane med fem pladser til tårne"></canvas>
     <div class="slots">${[0, 1, 2, 3, 4].map(i => `<button class="slot-b${i === P.sel ? ' on' : ''}" data-s="${i}" type="button">Plads ${i + 1}</button>`).join('')}</div>
-    ${shop}
-    ${P.ready ? '' : '<button class="btn primary big" id="tw-ready" type="button">Klar til bølgen</button>'}`;
+    ${shop}<button class="btn primary big" id="tw-back" type="button">Tilbage til spørgsmålene</button>`;
   const cv = $('#tw-cv');
-  drawTowerField(cv, { towers: P.towers, sel: P.ready ? -1 : P.sel, hp: s.me.hp });
-  const pickSlot = i => { if (i >= 0 && !P.ready) { P.sel = i; buildView(s, top); } };
+  drawTowerField(cv, { towers: P.towers, sel: P.sel, hp: me.hp });
+  const commit = () => { me.towers = P.towers; P.client.send({ t: 'build', towers: P.towers.map(x => ({ slot: x.slot, type: x.type, lvl: x.lvl })) }); };
+  const pickSlot = i => { if (i >= 0) { P.sel = i; buildView(); } };
   cv.onclick = e => pickSlot(slotAt(cv, e.clientX));
   $$('#play .slot-b').forEach(b => { b.onclick = () => pickSlot(+b.dataset.s); });
-  $$('#play [data-buy]').forEach(b => { b.onclick = () => { P.towers.push({ slot: P.sel, type: b.dataset.buy, lvl: 1 }); SFX.coin(); sendBuild(s); buildView(s, top); }; });
-  const upb = $('#tw-up'); if (upb) upb.onclick = () => { t.lvl++; SFX.coin(); sendBuild(s); buildView(s, top); };
-  const sell = $('#tw-sell'); if (sell) sell.onclick = () => { P.towers = P.towers.filter(x => x !== t); sendBuild(s); buildView(s, top); };
-  const rd = $('#tw-ready'); if (rd) rd.onclick = () => { P.ready = true; sendBuild(s); buildView(s, top); };
+  $$('#play [data-buy]').forEach(b => { b.onclick = () => { P.towers.push({ slot: P.sel, type: b.dataset.buy, lvl: 1 }); me.coins -= TOWERS[b.dataset.buy].cost; SFX.coin(); commit(); buildView(); }; });
+  const upb = $('#tw-up'); if (upb) upb.onclick = () => { me.coins -= upgradeCost(t.type, t.lvl); t.lvl++; SFX.coin(); commit(); buildView(); };
+  const sell = $('#tw-sell'); if (sell) sell.onclick = () => { me.coins += towerSpent([t]); P.towers = P.towers.filter(x => x !== t); commit(); buildView(); };
+  $('#tw-back').onclick = () => { P.building = false; resumeQ(); render(); };
+  clock();
 }
-function sendBuild(s) { P.client.send({ t: 'build', w: s.wave, towers: P.towers.map(t => ({ slot: t.slot, type: t.type, lvl: t.lvl })), ready: !!P.ready }); }
+function resumeQ() { if (P.q && P.q.pausedAt) { P.q.t0 += performance.now() - P.q.pausedAt; P.q.pausedAt = 0; } }
 
-/* Tårnforsvar: bølge */
-function waveView(s, top) {
-  const root = $('#play');
-  const towers = s.towers || [];
-  const res = s.me.last && s.me.last.wave;
-  if (P.animWave === s.wave && P.animDone) {
-    root.innerHTML = `${top}<div class="state ${res && res.leaked === 0 ? 'good' : ''}"><h2>${res ? `Du stoppede ${res.kills} af ${res.count}` : 'Bølgen er slut'}</h2><p class="muted">${res && res.leaked ? `${res.leaked} slap igennem til borgen.` : 'Ingen nåede borgen!'}</p></div><canvas id="tw-cv" class="tw-cv"></canvas>`;
-    drawTowerField($('#tw-cv'), { towers, hp: s.me.hp });
-    return;
-  }
-  if (P.animWave === s.wave) return; // kører allerede
-  P.animWave = s.wave; P.animDone = false;
-  root.innerHTML = `${top}<div class="center"><h2 class="big-msg sm">Bølge ${s.wave}!</h2></div><canvas id="tw-cv" class="tw-cv"></canvas>`;
-  const sim = simWave(towers, s.wave, true);
-  const cv = $('#tw-cv'); let i = 0, lastT = 0;
-  const hp0 = s.me.hp + (res ? res.leaked : 0);
-  let leaked = 0;
+function startWave() {
+  const w = P.wave, r = root(), me = P.me || {};
+  r.innerHTML = `${topHTML()}<div class="center"><h2 class="big-msg sm">Bølge ${w.w} angriber!</h2></div><canvas id="tw-cv" class="tw-cv"></canvas><p class="center" id="wv-res">&nbsp;</p>`;
+  const sim = simWave(w.towers, w.w, true);
+  const cv = $('#tw-cv'); let i = 0, lastT = 0, leaked = 0;
+  const hp0 = (me.hp || 0) + w.res.leaked;
   const step = ts => {
-    if (!P || P.animWave !== s.wave) return;
+    if (!P || P.wave !== w) return;
     if (ts - lastT > 40) {
       lastT = ts;
       const f = sim.frames[Math.min(i, sim.frames.length - 1)];
-      if (i > 0) { const prev = sim.frames[i - 1]; prev.m.forEach((m, k) => { if (m && m[0] >= 99 && !f.m[k]) leaked++; }); }
-      drawTowerField(cv, { towers, frame: f, hp: Math.max(0, hp0 - leaked) });
+      if (i > 0) sim.frames[i - 1].m.forEach((m, k) => { if (m && m[0] >= 99 && !f.m[k]) leaked++; });
+      drawTowerField(cv, { towers: w.towers, frame: f, hp: Math.max(0, hp0 - leaked) });
       i++;
     }
     if (i < sim.frames.length) anim = requestAnimationFrame(step);
-    else { P.animDone = true; setTimeout(() => { if (P && P.s && P.s.phase === 'wave') render(); }, 600); }
+    else {
+      const res = w.res;
+      $('#wv-res').innerHTML = `<b>Du stoppede ${res.kills} af ${res.count}.</b> ${res.leaked ? `${res.leaked} slap igennem til borgen.` : 'Ingen nåede borgen!'}`;
+      (res.leaked ? SFX.bad : SFX.good)();
+      setTimeout(() => {
+        if (!P || P.wave !== w) return;
+        P.wave = null; resumeQ();
+        if (P.view === 'res' || P.view === 'chestres') { render(); auto(800); } else render();
+      }, 1800);
+    }
   };
   anim = requestAnimationFrame(step);
 }

@@ -1,14 +1,14 @@
 // Spillogik uden DOM. Bruges af både tavle, værtsskærm og elevskærm.
 
 export const MODES = {
-  classic: { name: 'Klassisk',   desc: 'Hurtige, rigtige svar giver flest point.', live: true, board: true, unit: 'point' },
-  gold:    { name: 'Guldjagt',   desc: 'Rigtigt svar giver en kiste: guld, dobbelt op, eller stjæl fra andre.', live: true, board: true, boardTeams: true, unit: 'guld' },
-  team:    { name: 'Holdkamp',   desc: 'Klassen deles i hold, der kæmper om point.', live: true, board: true, boardTeams: true, liveTeams: true, unit: 'point' },
-  race:    { name: 'Racerløb',   desc: 'Rigtige svar sender dig frem. Først i mål vinder.', live: true, board: true, boardTeams: true, unit: 'felter' },
-  fish:    { name: 'Fiskeri',    desc: 'Rigtigt svar = kast snøren. Tungeste fangst vinder.', live: true, board: true, boardTeams: true, unit: 'kg' },
-  tower:   { name: 'Tårnforsvar', desc: 'Tjen mønter, byg tårne og stop monstrene.', live: true, board: false, unit: 'point' },
-  duel:    { name: 'Duel',       desc: 'To og to mod hinanden. Hurtigste rigtige svar vinder duellen.', live: true, board: false, unit: 'point' },
-  self:    { name: 'Selvstudie', desc: 'Hver elev øver i eget tempo. Du følger med.', live: true, board: false, unit: '' },
+  classic: { name: 'Klassisk',    desc: 'Rigtige svar giver point. Hurtige svar og stime giver bonus.', live: true, board: true, unit: 'point' },
+  gold:    { name: 'Guldjagt',    desc: 'Rigtigt svar giver en kiste: guld, dobbelt op, eller stjæl fra andre.', live: true, board: true, boardTeams: true, unit: 'guld' },
+  team:    { name: 'Holdkamp',    desc: 'Klassen deles i hold, der samler point sammen.', live: true, board: true, boardTeams: true, liveTeams: true, unit: 'point' },
+  race:    { name: 'Racerløb',    desc: 'Rigtige svar sender dig frem. Først i mål vinder.', live: true, board: true, boardTeams: true, unit: 'felter' },
+  fish:    { name: 'Fiskeri',     desc: 'Rigtigt svar = kast snøren. Stime giver held. Tungeste fangst vinder.', live: true, board: true, boardTeams: true, unit: 'kg' },
+  tower:   { name: 'Tårnforsvar', desc: 'Tjen mønter, byg tårne og stop monsterbølgerne.', live: true, board: false, unit: 'point' },
+  duel:    { name: 'Duel',        desc: 'Rigtige svar rammer din modstander. Vind dueller og få en ny.', live: true, board: false, unit: 'sejre' },
+  self:    { name: 'Selvstudie',  desc: 'Eget tempo. Forkerte spørgsmål kommer igen, til alt sidder.', live: true, board: false, unit: '' },
 };
 
 export const TEAMS = [
@@ -183,3 +183,12 @@ export function prepQuestions(quiz, o = {}) {
 export const correctIdx = q => q.opts.map((o, i) => o.ok ? i : -1).filter(i => i >= 0);
 // Til selvstudie: {q, opts:[tekst], c:[indeks], img}
 export const selfQuestions = qs => qs.map(x => ({ q: x.q, opts: x.opts.map(o => o.t), c: correctIdx(x), img: x.img || null }));
+
+/* Live i eget tempo */
+export const streakBonus = streak => Math.min(Math.max(streak - 1, 0), 5) * 50;
+export const liveRaceGoal = minutes => Math.max(12, Math.round((minutes || 5) * 4));
+export const liveRaceSteps = (streak, rand = R) => 1 + (streak >= 3 ? 1 : 0) + (rand() < 0.25 ? 1 : 0);
+export const fishLuck = (streak, ms, durMs) => Math.min(1, 0.12 * Math.min(streak, 5) + 0.4 * (1 - Math.min(ms, durMs) / durMs));
+export const DUEL_HP = 10;
+export const duelDamage = (streak, rand = R) => 2 + (streak >= 3 ? 1 : 0) + (rand() < 0.3 ? 1 : 0);
+export const WAVE_FIRST_MS = 45000, WAVE_EVERY_MS = 40000;

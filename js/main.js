@@ -138,19 +138,21 @@ function openSetup(q) {
   $('#setup').hidden = false; syncSetup();
 }
 function opt() {
-  return { where: $('input[name=where]:checked').value, mode: $('input[name=mode]:checked').value, teams: +$('#o-teams').value, timer: $('#o-timer').checked, shufQ: $('#o-shufq').checked, shufA: $('#o-shufa').checked };
+  return { where: $('input[name=where]:checked').value, mode: $('input[name=mode]:checked').value, teams: +$('#o-teams').value, timer: $('#o-timer').checked, len: +$('#o-len').value, shufQ: $('#o-shufq').checked, shufA: $('#o-shufa').checked };
 }
 function syncSetup() {
   const o = opt(), m = MODES[o.mode];
   $$('#modes input').forEach(i => { const md = MODES[i.value]; i.disabled = o.where === 'board' && !md.board; });
   $('#teams-wrap').hidden = !((o.where === 'board' && m.boardTeams) || (o.where === 'live' && m.liveTeams));
   $('#timer-wrap').hidden = o.where !== 'board';
+  $('#len-wrap').hidden = o.where !== 'live';
+  $('#shufq-wrap').hidden = o.where !== 'board';
   const note = $('#setup-note'), err = $('#setup-err'), go = $('#setup-go');
   note.hidden = true; err.hidden = true; go.disabled = false;
   if (o.where === 'board' && !m.board) { err.textContent = `${m.name} spilles på elevernes egne enheder. Vælg Live.`; err.hidden = false; go.disabled = true; }
   else if (o.where === 'live' && !p2pAvailable()) { err.textContent = 'Live kunne ikke indlæses. Genindlæs siden.'; err.hidden = false; go.disabled = true; }
   else if (o.where === 'board' && m.boardTeams) { note.textContent = 'På tavlen spiller klassen på hold. Du markerer, hvilke hold der svarede rigtigt.'; note.hidden = false; }
-  else if (o.where === 'live') { note.textContent = 'Eleverne går ind på siden, trykker Deltag i spil og skriver koden. Intet login.'; note.hidden = false; }
+  else if (o.where === 'live') { note.textContent = 'Hver elev spiller i eget tempo på sin egen enhed, og tavlen viser den samlede stilling live. Eleverne går ind på siden og skriver koden. Intet login.'; note.hidden = false; }
 }
 function initSetup() {
   $('#modes').innerHTML = Object.entries(MODES).map(([k, m], i) => `<label><input type="radio" name="mode" value="${k}" id="m-${k}"${i === 0 ? ' checked' : ''}><span><b>${m.name}</b><small>${m.desc}</small>${m.board ? '' : '<em>Kun live</em>'}</span></label>`).join('');
