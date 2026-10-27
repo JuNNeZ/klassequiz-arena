@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="da">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Klassequiz Arena</title>
+<meta name="description" content="Gratis quizspil til klassen: tavle, live på elevernes egne enheder uden login, otte spiltyper og billeder.">
+<meta name="theme-color" content="#14251f">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231b322d'/%3E%3Crect x='10' y='10' width='20' height='20' rx='4' fill='%23d64b42'/%3E%3Crect x='34' y='10' width='20' height='20' rx='4' fill='%232f7fc8'/%3E%3Crect x='10' y='34' width='20' height='20' rx='4' fill='%23e3b836'/%3E%3Crect x='34' y='34' width='20' height='20' rx='4' fill='%238a5cc7'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&display=swap">
+<link rel="stylesheet" href="css/style.css">
+<script src="js/vendor/peerjs.min.js" defer></script>
+<script src="js/vendor/qrcode.js" defer></script>
+<script type="module" src="js/main.js"></script>
+</head>
+<body>
+<header class="top">
+  <div class="wrap top-in">
+    <button class="brand" id="go-home" type="button">Klasse<b>quiz</b> Arena</button>
+    <nav aria-label="Hovedmenu">
+      <button class="nav" id="nav-lib" type="button">Quizzer</button>
+      <button class="nav" id="nav-join" type="button">Deltag i spil</button>
+      <button class="nav" id="nav-snd" type="button" aria-pressed="true">Lyd: til</button>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <!-- BIBLIOTEK -->
+  <section id="v-lib" hidden>
+    <div class="lib-head">
+      <div>
+        <h1>Quizzer</h1>
+        <p class="muted">Spil på tavlen, live på elevernes egne enheder uden login, eller lad dem øve selv. Dine quizzer gemmes i denne browser.</p>
+      </div>
+      <div class="row">
+        <button class="btn ghost" id="b-backup" type="button">Backup af alle</button>
+        <button class="btn" id="b-import" type="button">Importér</button>
+        <button class="btn primary" id="b-new" type="button">Ny quiz</button>
+      </div>
+    </div>
+    <div class="grid" id="lib-grid"></div>
+    <div class="howto">
+      <div><h3>Tavle</h3><p>Én skærm på projektoren. Klassen svarer højt eller på hold, og du giver point med et klik. Mellemrum går videre.</p></div>
+      <div><h3>Live</h3><p>Du får en firecifret kode og en QR-kode. Eleverne svarer på iPad eller telefon. Intet login, kun et kaldenavn.</p></div>
+      <div><h3>Øv selv</h3><p>Del et øvelink til lektier. Eleven får svar med det samme og kan øve de forkerte igen.</p></div>
+    </div>
+  </section>
+
+  <!-- EDITOR -->
+  <section id="v-edit" hidden>
+    <div class="row" style="justify-content:space-between">
+      <h1 id="ed-h" class="ed-title-h">Ny quiz</h1>
+      <button class="btn ghost" id="ed-cancel" type="button">Tilbage</button>
+    </div>
+    <div class="ed-head">
+      <div class="field"><label for="ed-title">Titel</label><input type="text" id="ed-title" maxlength="80" placeholder="Fx Brøker"></div>
+      <div class="field"><label for="ed-subject">Fag</label><input type="text" id="ed-subject" maxlength="30" placeholder="Matematik"></div>
+      <div class="field"><label for="ed-grade">Klassetrin</label><input type="text" id="ed-grade" maxlength="30" placeholder="5. klasse"></div>
+    </div>
+    <div class="row ed-tools">
+      <button class="btn" id="ed-autoimg" type="button">Find billeder automatisk</button>
+      <span class="muted small">Foreslår frie billeder fra Wikimedia Commons til spørgsmål uden billede.</span>
+    </div>
+    <div id="ed-errs" class="ed-errs" hidden></div>
+    <div id="ed-list"></div>
+    <button class="btn" id="ed-add" type="button">+ Tilføj spørgsmål</button>
+    <div class="sticky-save row end">
+      <span class="muted small" id="ed-count" style="margin-right:auto"></span>
+      <button class="btn ghost" id="ed-cancel2" type="button">Annullér</button>
+      <button class="btn primary" id="ed-save" type="button">Gem quiz</button>
+    </div>
+  </section>
+
+  <!-- SPILSCENE -->
+  <section id="v-game" hidden>
+    <div class="stage-top">
+      <div class="prog"><b id="g-title"></b><span class="muted num" id="g-count"></span></div>
+      <div class="teamstrip" id="g-teams"></div>
+      <div class="timer" id="g-timer" hidden><span id="g-time">20</span></div>
+      <button class="btn ghost" id="g-full" type="button" title="Fuld skærm">Fuld skærm</button>
+      <button class="btn ghost" id="g-quit" type="button">Afslut</button>
+    </div>
+    <div id="g-body"></div>
+    <div class="stage-foot">
+      <span class="kbd" id="g-status"></span>
+      <button class="btn primary big" id="g-next" type="button">Videre</button>
+    </div>
+  </section>
+
+  <!-- ELEV -->
+  <section id="v-join" hidden>
+    <div class="join-card" id="join-form">
+      <h1>Deltag i spil</h1>
+      <label class="lbl" for="j-code">Spilkode</label>
+      <input type="text" id="j-code" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="0000">
+      <label class="lbl" for="j-name">Dit navn</label>
+      <input type="text" id="j-name" maxlength="20" autocomplete="off" placeholder="Fx Emma">
+      <button class="btn primary big" id="j-go" type="button">Deltag</button>
+      <p class="err" id="j-err" hidden></p>
+      <p class="muted small">Koden står på lærerens skærm. Du skal ikke logge ind.</p>
+    </div>
+    <div class="play" id="play" hidden></div>
+  </section>
+
+  <!-- ØV SELV -->
+  <section id="v-self" hidden>
+    <div class="shared-bar" id="shared-bar" hidden>
+      <span>Øvelink: <b id="shared-title"></b></span>
+      <span class="row"><button class="btn" id="shared-save" type="button">Gem i mine quizzer</button><button class="btn ghost" id="shared-close" type="button">Luk</button></span>
+    </div>
+    <div class="play" id="self-root"></div>
+  </section>
+</main>
+
+<!-- START-DIALOG -->
+<div class="modal" id="setup" hidden role="dialog" aria-modal="true" aria-labelledby="setup-h">
+  <div class="sheet">
+    <h2 id="setup-h">Start quiz</h2>
+    <fieldset>
+      <legend>Hvor spiller I?</legend>
+      <div class="choice two">
+        <label><input type="radio" name="where" value="board" id="w-board" checked><span><b>Tavle</b><small>Én skærm. Klassen svarer højt eller på hold.</small></span></label>
+        <label><input type="radio" name="where" value="live" id="w-live"><span><b>Live</b><small>Eleverne svarer på egne enheder med en kode. Intet login.</small></span></label>
+      </div>
+    </fieldset>
+    <fieldset>
+      <legend>Spiltype</legend>
+      <div class="choice four" id="modes"></div>
+    </fieldset>
+    <fieldset>
+      <legend>Indstillinger</legend>
+      <div class="opts">
+        <label id="teams-wrap" for="o-teams">Antal hold
+          <select id="o-teams"><option>2</option><option selected>3</option><option>4</option><option>5</option><option>6</option></select></label>
+        <label id="timer-wrap"><input type="checkbox" id="o-timer" checked> Nedtælling</label>
+        <label><input type="checkbox" id="o-shufq"> Bland spørgsmål</label>
+        <label><input type="checkbox" id="o-shufa"> Bland svar</label>
+      </div>
+    </fieldset>
+    <p class="note" id="setup-note" hidden></p>
+    <p class="err" id="setup-err" hidden></p>
+    <div class="row end">
+      <button class="btn ghost" id="setup-cancel" type="button">Annullér</button>
+      <button class="btn primary big" id="setup-go" type="button">Start spil</button>
+    </div>
+  </div>
+</div>
+
+<!-- IMPORT / EKSPORT / DEL -->
+<div class="modal" id="io" hidden role="dialog" aria-modal="true" aria-labelledby="io-h">
+  <div class="sheet">
+    <h2 id="io-h">Importér quiz</h2>
+    <div data-io="import">
+      <p class="muted mt0">Virker med Blookets CSV-skabelon og med backupfiler herfra (.json). En simpel CSV kan have kolonnerne: spørgsmål, svar 1–4, rigtigt svar (fx 2 eller 1,3), tid, billedlink.</p>
+      <div class="field"><label for="io-file">Vælg fil</label><input type="file" id="io-file" accept=".csv,.json,text/csv,application/json,text/plain"></div>
+      <div class="field mt10"><label for="io-text">… eller indsæt indholdet her</label><textarea id="io-text" rows="6" placeholder="Hvad er 1/2 + 1/4?;3/4;2/6;2/4;1/6;1;30;https://…/billede.jpg"></textarea></div>
+    </div>
+    <div data-io="export" hidden>
+      <div class="export-opts">
+        <button class="exp" id="io-csv" type="button"><b>Blooket-CSV</b><span>Kan importeres i Blooket. Uden billeder.</span></button>
+        <button class="exp" id="io-json" type="button"><b>Backupfil</b><span>Alt inkl. billeder. Importér den her på en anden computer.</span></button>
+      </div>
+    </div>
+    <div data-io="share" hidden>
+      <p class="muted mt0">Eleverne kan åbne linket på enhver enhed og øve quizzen selv. Ingen kode og intet login.</p>
+      <div class="field"><label for="io-link">Øvelink</label><textarea id="io-link" rows="3" readonly></textarea></div>
+      <p class="note" id="io-upnote" hidden>Billeder, du selv har uploadet, kommer ikke med i linket. Billeder fra nettet gør.</p>
+    </div>
+    <p class="err" id="io-err" hidden></p>
+    <div class="row end">
+      <button class="btn ghost" id="io-cancel" type="button">Luk</button>
+      <button class="btn primary" id="io-go" type="button">Importér</button>
+    </div>
+  </div>
+</div>
+
+<!-- BILLEDVÆLGER -->
+<div class="modal" id="imgpick" hidden role="dialog" aria-modal="true" aria-labelledby="ip-h">
+  <div class="sheet wide">
+    <h2 id="ip-h">Vælg billede</h2>
+    <div class="tabs" role="tablist">
+      <button type="button" role="tab" data-tab="find" aria-selected="true">Find billede</button>
+      <button type="button" role="tab" data-tab="upload" aria-selected="false">Upload</button>
+      <button type="button" role="tab" data-tab="link" aria-selected="false">Link</button>
+    </div>
+    <div data-pane="find">
+      <form id="ip-form" class="row">
+        <label class="sr" for="ip-q">Søgeord</label>
+        <input type="text" id="ip-q" placeholder="Fx planet, pizza, river" style="flex:1;min-width:0">
+        <button class="btn primary" type="submit">Søg</button>
+      </form>
+      <p class="muted small">Frie billeder fra Wikimedia Commons. Pas på, at billedet ikke afslører svaret.</p>
+      <div class="ip-grid" id="ip-results"></div>
+    </div>
+    <div data-pane="upload" hidden>
+      <div class="field"><label for="ip-file">Vælg et billede fra computeren</label><input type="file" id="ip-file" accept="image/*"></div>
+      <p class="muted small">Billedet gøres mindre, så det fylder lidt.</p>
+    </div>
+    <div data-pane="link" hidden>
+      <div class="field"><label for="ip-url">Link til billede</label><input type="text" id="ip-url" placeholder="https://…/billede.jpg"></div>
+      <div class="row mt10"><button class="btn primary" id="ip-url-go" type="button">Brug linket</button></div>
+    </div>
+    <p class="err" id="ip-err" hidden></p>
+    <div class="row end">
+      <button class="btn ghost danger" id="ip-remove" type="button">Fjern billede</button>
+      <button class="btn ghost" id="ip-cancel" type="button">Luk</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" role="status" aria-live="polite"></div>
+<noscript><p class="wrap">Klassequiz Arena kræver JavaScript.</p></noscript>
+</body>
+</html>

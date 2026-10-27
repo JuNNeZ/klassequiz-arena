@@ -1,0 +1,141 @@
+// Billeder: søgning på Wikimedia Commons, upload med nedskalering, link.
+import { $, $$, esc } from './util.js';
+
+const API = 'https://commons.wikimedia.org/w/api.php';
+const OK_LIC = /public domain|^pd|cc0|cc[ -]by/i;
+const cache = new Map();
+
+export async function commonsSearch(query, limit = 12) {
+  const key = query + '|' + limit;
+  if (cache.has(key)) return cache.get(key);
+  const p = new URLSearchParams({
+    action: 'query', generator: 'search', gsrsearch: query + ' filetype:bitmap', gsrnamespace: '6', gsrlimit: String(limit),
+    prop: 'imageinfo', iiprop: 'url|extmetadata|size', iiextmetadatafilter: 'Artist|LicenseShortName', iiurlwidth: '800',
+    format: 'json', origin: '*',
+  });
+  const res = await fetch(API + '?' + p.toString());
+  if (!res.ok) throw new Error('Søgningen fejlede (' + res.status + ')');
+  const d = await res.json();
+  const pages = Object.values((d.query && d.query.pages) || {}).sort((a, b) => (a.index || 0) - (b.index || 0));
+  const out = [];
+  for (const pg of pages) {
+    const ii = pg.imageinfo && pg.imageinfo[0]; if (!ii || !ii.thumburl) continue;
+    const m = ii.extmetadata || {};
+    const lic = (m.LicenseShortName && m.LicenseShortName.value) || '';
+    if (lic && !OK_LIC.test(lic)) continue;
+    const tmp = document.createElement('div'); tmp.innerHTML = (m.Artist && m.Artist.value) || '';
+    const credit = (tmp.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 80) || 'Wikimedia Commons';
+    out.push({ src: ii.thumburl.split('?')[0], credit, lic, page: ii.descriptionurl, w: ii.width, h: ii.height });
+  }
+  cache.set(key, out);
+  return out;
+}
+
+const STOP = new Set(('hvad hvilken hvilket hvilke hvem hvor hvordan hvorfor hvornår hvis er var bliver blev være været det den de der dem en et i '
+  + 'på af til med og at som har have havde mange meget mest flest hedder kaldes ikke man kan kunne skal skulle vil ville for fra om '
+  + 'vores vor sin sit sine sig dag i dag nu også eller men så her ud op ned over under efter før mellem mod ved hos største største '
+  + 'mindste længste korteste næststørste bedst bedste først første sidste lig samme hvilke the of a an is are what which how many '
+  + 'tal svar rigtigt forkert ord sætningen sætning gang').split(' '));
+
+export function keywords(text) {
+  return String(text || '').toLowerCase()
+    .replace(/["“”'’`´.,!?;:()[\]{}–—\-/\\*+=<>|0-9%]/g, ' ')
+    .split(/\s+/).filter(w => w.length > 2 && !STOP.has(w));
+}
+
+// Prøver flere søgninger fra specifik til bred. Returnerer resultatliste.
+export async function autoSearch(question, subject) {
+  const kw = keywords(question);
+  const tries = [];
+  if (kw.length) tries.push(kw.slice(0, 4).join(' '));
+  if (kw.length > 2) tries.push(kw.slice(0, 2).join(' '));
+  if (kw.length) tries.push(kw[0]);
+  if (subject) tries.push(subject);
+  for (const t of tries) {
+    try { const r = await commonsSearch(t, 8); if (r.length) return { query: t, results: r }; } catch (e) { /* prøv næste */ }
+  }
+  return { query: tries[0] || '', results: [] };
+}
+
+export function fileToDataURL(file, max = 960, quality = 0.82) {
+  return new Promise((res, rej) => {
+    if (!/^image\//.test(file.type)) return rej(new Error('Filen er ikke et billede.'));
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const s = Math.min(1, max / Math.max(img.width, img.height));
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.width * s); c.height = Math.round(img.height * s);
+      const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height);
+      g.drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      res(c.toDataURL('image/jpeg', quality));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); rej(new Error('Billedet kunne ikke læses.')); };
+    img.src = url;
+  });
+}
+
+/* ---------- billedvælger (modal) ---------- */
+let resolver = null, current = null;
+
+export function openImagePicker({ query = '', img = null, subject = '' } = {}) {
+  current = img;
+  const m = $('#imgpick');
+  $('#ip-q').value = query;
+  $('#ip-url').value = img && /^https?:/.test(img.src) ? img.src : '';
+  $('#ip-err').hidden = true;
+  $('#ip-file').value = '';
+  setTab('find');
+  m.hidden = false;
+  $('#ip-results').innerHTML = '';
+  if (query) runSearch(query);
+  else $('#ip-results').innerHTML = '<p class="muted">Skriv et søgeord. Engelske ord giver ofte flest resultater.</p>';
+  setTimeout(() => $('#ip-q').focus(), 30);
+  return new Promise(r => { resolver = r; });
+}
+function close(val) { $('#imgpick').hidden = true; const r = resolver; resolver = null; if (r) r(val); }
+function setTab(t) {
+  $$('#imgpick [data-tab]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === t)));
+  $$('#imgpick [data-pane]').forEach(p => { p.hidden = p.dataset.pane !== t; });
+}
+function err(msg) { const e = $('#ip-err'); e.textContent = msg; e.hidden = !msg; }
+
+async function runSearch(q) {
+  const box = $('#ip-results');
+  box.innerHTML = '<p class="muted">Søger…</p>'; err('');
+  try {
+    const r = await commonsSearch(q, 16);
+    if (!r.length) { box.innerHTML = '<p class="muted">Ingen billeder fundet. Prøv et andet ord, gerne på engelsk.</p>'; return; }
+    box.innerHTML = r.map((x, i) => `<button class="ip-hit" type="button" data-i="${i}"><img src="${esc(x.src)}" alt="" loading="lazy"><span>${esc(x.credit)} · ${esc(x.lic || 'fri licens')}</span></button>`).join('');
+    $$('.ip-hit', box).forEach(b => { b.onclick = () => { const x = r[+b.dataset.i]; close({ src: x.src, credit: x.credit, lic: x.lic, page: x.page }); }; });
+  } catch (e) {
+    box.innerHTML = ''; err('Kunne ikke søge efter billeder. Tjek internetforbindelsen.');
+  }
+}
+
+export function initImagePicker() {
+  $$('#imgpick [data-tab]').forEach(b => { b.onclick = () => setTab(b.dataset.tab); });
+  $('#ip-form').onsubmit = e => { e.preventDefault(); const q = $('#ip-q').value.trim(); if (q) runSearch(q); };
+  $('#ip-cancel').onclick = () => close(undefined);
+  $('#ip-remove').onclick = () => close(null);
+  $('#ip-file').onchange = async () => {
+    const f = $('#ip-file').files[0]; if (!f) return;
+    try { close({ src: await fileToDataURL(f), credit: 'Eget billede' }); } catch (e) { err(e.message); }
+  };
+  $('#ip-url-go').onclick = () => {
+    const u = $('#ip-url').value.trim();
+    if (!/^https:\/\/\S+$/i.test(u)) { err('Indsæt et link, der starter med https://'); return; }
+    const test = new Image();
+    test.onload = () => close({ src: u });
+    test.onerror = () => err('Billedet kunne ikke hentes fra linket. Brug et direkte link til en billedfil.');
+    test.src = u;
+  };
+  $('#imgpick').addEventListener('keydown', e => { if (e.key === 'Escape') close(undefined); });
+}
+
+export function imgHTML(img, cls = '') {
+  if (!img || !img.src) return '';
+  const credit = img.credit ? `<figcaption>${img.page ? `<a href="${esc(img.page)}" target="_blank" rel="noopener">` : ''}${esc(img.credit)}${img.lic ? ' · ' + esc(img.lic) : ''}${img.page ? '</a>' : ''}</figcaption>` : '';
+  return `<figure class="qimg ${cls}"><img src="${esc(img.src)}" alt="" decoding="async">${credit}</figure>`;
+}
