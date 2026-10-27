@@ -22,6 +22,7 @@ Gratis quizspil til undervisning, inspireret af Kahoot og Blooket. Kører som en
 | Tårnforsvar – tjen mønter, byg tårne, stop monstrene | | ✓ |
 | Duel – to og to mod hinanden | | ✓ |
 | Pindekrig – Rød mod Blå: rigtige svar giver guld til soldater, slaget kører live på tavlen | | ✓ |
+| Klassen mod computeren – runde for runde: svar, køb soldater og fælles opgraderinger, se kampen på tavlen; forkerte svar styrker computeren | | ✓ |
 | Pindekrig solo – hver elev fører sin hær mod computeren og rykker op slag for slag | | ✓ |
 | Selvstudie – eget tempo, læreren følger fremgangen | | ✓ |
 

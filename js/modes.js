@@ -9,6 +9,7 @@ export const MODES = {
   tower:   { name: 'Tårnforsvar', desc: 'Tjen mønter, byg tårne og stop monsterbølgerne.', live: true, board: false, unit: 'point' },
   duel:    { name: 'Duel',        desc: 'Rigtige svar rammer din modstander. Vind dueller og få en ny.', live: true, board: false, unit: 'sejre' },
   war:     { name: 'Pindekrig',      desc: 'Rød mod Blå. Rigtige svar giver guld til soldater, og slaget kører live på tavlen.', live: true, board: false, liveTeams: true, fixedTeams: 2, unit: 'skade' },
+  warcoop: { name: 'Klassen mod computeren', desc: 'Runde for runde: svar, køb soldater og opgraderinger sammen, og se kampen på tavlen. Forkerte svar styrker computeren.', live: true, board: false, unit: 'skade' },
   warsolo: { name: 'Pindekrig solo', desc: 'Hver elev fører sin egen hær mod computeren. Vind slag og ryk op.', live: true, board: false, unit: 'point' },
   self:    { name: 'Selvstudie',  desc: 'Eget tempo. Forkerte spørgsmål kommer igen, til alt sidder.', live: true, board: false, unit: '' },
 };

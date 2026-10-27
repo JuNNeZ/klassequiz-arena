@@ -4,7 +4,7 @@ import { TEAMS, MODES, TOWERS, TOWER_TYPES, MAX_LVL, upgradeCost, towerSpent, si
 import { tilesHTML, questionHTML, chestsHTML, catchHTML, drawTowerField, slotAt } from './ui.js';
 import { avatarSVG, avatarName, AVATAR_COUNT } from './avatars.js';
 import { Client, p2pAvailable } from './net.js';
-import { UNITS, UNIT_TYPES, newBattle, spawn, step, newAI, aiStep, drawBattle, TICK_MS, unitIconSVG } from './war.js';
+import { UNITS, UNIT_TYPES, newBattle, spawn, step, newAI, aiStep, drawBattle, TICK_MS, unitIconSVG, UPGRADES, UPGRADE_KEYS } from './war.js';
 
 export let P = null;
 let autoT = 0, clockT = 0, anim = 0, warT = 0, warRaf = 0;
@@ -67,6 +67,7 @@ function onData(d) {
     case 'state': {
       const was = P.s && P.s.phase;
       P.s = d;
+      if (d.coop) { P.coop = d.coop; P.coopAt = Date.now(); }
       document.body.dataset.world = d.mode;
       if (d.left != null) P.endAt = Date.now() + d.left;
       if (d.me && Number.isInteger(d.me.av)) P.av = d.me.av;
@@ -100,6 +101,11 @@ function onData(d) {
       P.building = false; clearTimeout(autoT); startWave(); return;
     case 'done': P.view = 'done'; break;
     case 'war': P.war = d; warMini(); shopRefresh(); return;
+    case 'coop': {
+      const prev = P.coop && P.coop.sub; P.coop = d.c; P.coopAt = Date.now();
+      if (prev !== d.c.sub) { if (d.c.sub === 'shop') SFX.coin(); render(); } else coopRefresh();
+      return;
+    }
     case 'gold': SFX.coin(); shopRefresh(); refreshTop(); return;
     default: return;
   }
@@ -147,7 +153,7 @@ function statLine(me, mode, s) {
   if (mode === 'gold') return fmt(me.score) + ' guld';
   if (mode === 'duel') return `${me.wins} ${me.wins === 1 ? 'sejr' : 'sejre'}`;
   if (mode === 'self') return `${me.correct} rigtige`;
-  if (mode === 'war') return `${me.gold} guld`;
+  if (mode === 'war' || mode === 'warcoop') return `${me.gold} guld`;
   if (mode === 'warsolo') return P.ws ? `${Math.floor(P.ws.gold)} guld · slag ${P.ws.stage}` : '';
   return fmt(me.score) + ' point';
 }
@@ -187,6 +193,8 @@ function render() {
   if (s.phase === 'lobby' || s.phase === 'opening') return lobbyView(s);
   if (s.phase === 'end') return endView(s);
   if (P.wave) return; // bølgen kører
+  if (s.mode === 'warcoop' && P.coop && P.coop.sub === 'shop') return coopShopView();
+  if (s.mode === 'warcoop' && P.coop && P.coop.sub === 'battle') return coopBattleView();
   if (P.building) return buildView();
   const r = root();
   if (P.view === 'q' && P.q) return questionView();
@@ -256,6 +264,7 @@ function resultView() {
   if (d.ok && fx.dmg) p = `Du ramte ${fx.vs} for ${fx.dmg}!`;
   if (!d.ok && s.mode === 'self') p = 'Spørgsmålet kommer igen senere.';
   if (d.ok && fx.gold) p = `+${fx.gold} guld`;
+  if (!d.ok && fx.penalty) p = `Computeren fik ${fx.penalty} guld ekstra.`;
   r.innerHTML = `${topHTML()}${warHTML()}<div class="state ${d.ok ? 'good' : 'bad'} pop"><h2>${esc(h)}</h2>${p ? `<p>${esc(p)}</p>` : ''}${extra}${!d.ok && right.length ? `<p class="muted">Rigtigt svar: <b>${right.map(esc).join(' / ')}</b></p>` : ''}</div><div class="row center-row"><button class="btn primary big" id="p-next" type="button">Næste</button></div>`;
   $('#p-next').onclick = nextQ;
   bindShop();
@@ -267,8 +276,9 @@ function endView(s) {
   let teamLine = '';
   if (s.teams && me.team >= 0) { const ts = s.teams.map((t, i) => ({ i, v: t.score })).sort((a, b) => b.v - a.v); teamLine = `<p>Hold ${esc(s.teams[me.team].n)} blev nr. ${ts.findIndex(x => x.i === me.team) + 1} af ${s.teams.length}</p>`; }
   if (s.mode === 'war' && s.winTeam != null) teamLine = `<p><b>Hold ${esc(TEAMS[s.winTeam].n)} vandt slaget.</b> ${me.team === s.winTeam ? 'Det var jeres hold!' : ''}</p><p class="muted">Du fældede ${me.kills || 0} fjender.</p>`;
+  if (s.mode === 'warcoop') teamLine = `<p><b>${s.coopWon ? 'Computerens statue faldt.' : 'Computeren vandt denne gang.'}</b></p><p class="muted">Du brugte ${me.spent || 0} guld på hæren.</p>`;
   if (s.mode === 'warsolo' && P.ws) teamLine = `<p>Du vandt ${P.ws.wins} ${P.ws.wins === 1 ? 'slag' : 'slag'} og nåede slag ${P.ws.stage}.</p>`;
-  r.innerHTML = `<div class="state ${s.rank === 1 && s.mode !== 'self' ? 'good' : ''} pop"><div class="lobby-av">${avatarSVG(P.av, 96)}</div><h2>${s.mode === 'self' ? 'Godt arbejde!' : s.rank === 1 ? 'Du vandt!' : 'Godt spillet!'}</h2>${s.mode !== 'self' ? `<p>Du blev nr. <b>${s.rank}</b> af ${s.n}</p>` : ''}<p class="muted">${esc(statLine(me, s.mode, s))} · ${me.correct}/${me.answered} rigtige svar</p>${teamLine}</div><div class="row center-row"><button class="btn" id="p-leave" type="button">Forlad spillet</button></div>`;
+  r.innerHTML = `<div class="state ${(s.mode === 'warcoop' ? s.coopWon : s.rank === 1 && s.mode !== 'self') ? 'good' : 'plain'} pop"><div class="lobby-av">${avatarSVG(P.av, 96)}</div><h2>${s.mode === 'self' ? 'Godt arbejde!' : s.mode === 'warcoop' ? (s.coopWon ? 'Klassen vandt!' : 'Godt kæmpet!') : s.rank === 1 ? 'Du vandt!' : 'Godt spillet!'}</h2>${s.mode !== 'self' ? `<p>Du blev nr. <b>${s.rank}</b> af ${s.n}</p>` : ''}<p class="muted">${esc(statLine(me, s.mode, s))} · ${me.correct}/${me.answered} rigtige svar</p>${teamLine}</div><div class="row center-row"><button class="btn" id="p-leave" type="button">Forlad spillet</button></div>`;
   $('#p-leave').onclick = leave;
 }
 
@@ -333,14 +343,15 @@ function startWave() {
 }
 
 /* ---------- Pindekrig ---------- */
-const isWarMode = () => P && P.s && (P.s.mode === 'war' || P.s.mode === 'warsolo');
+const isWarMode = () => P && P.s && (P.s.mode === 'war' || P.s.mode === 'warsolo' || P.s.mode === 'warcoop');
 function myGold() { return P.s.mode === 'warsolo' ? Math.floor(P.ws ? P.ws.gold : 0) : ((P.me && P.me.gold) || 0); }
 function shopHTML() {
-  const g = myGold(), col = P.s.mode === 'war' ? ['#e5574c', '#3a8fdc'][(P.me && P.me.team) || 0] : '#3a8fdc';
+  const g = myGold(), col = P.s.mode === 'warcoop' ? '#3a8fdc' : P.s.mode === 'war' ? ['#e5574c', '#3a8fdc'][(P.me && P.me.team) || 0] : '#3a8fdc';
   return `<div class="war-shop" id="war-shop">${UNIT_TYPES.map(k => `<button class="unit-b" data-unit="${k}" type="button"${g < UNITS[k].cost ? ' disabled' : ''}>${unitIconSVG(k, col)}<b>${UNITS[k].n}</b><span>${UNITS[k].cost}</span></button>`).join('')}</div>`;
 }
 function warHTML() {
   if (!isWarMode() || P.s.phase !== 'play') return '';
+  if (P.s.mode === 'warcoop') return coopStripHTML();
   if (P.s.mode === 'warsolo') return `<canvas id="ws-cv" class="war-cv small" aria-label="Din slagmark"></canvas>${shopHTML()}`;
   return `<div class="war-mini" id="war-mini">${warMiniInner()}</div>${shopHTML()}`;
 }
@@ -364,7 +375,7 @@ function bindShop() {
   $$('#play .unit-b').forEach(b => {
     b.onclick = () => {
       const u = b.dataset.unit;
-      if (P.s.mode === 'war') { P.client.send({ t: 'buy', u }); return; }
+      if (P.s.mode === 'war' || P.s.mode === 'warcoop') { P.client.send({ t: 'buy', u }); return; }
       const ws = P.ws; if (!ws || ws.gold < UNITS[u].cost) return;
       if (spawn(ws.b, 0, u, 'me')) { ws.gold -= UNITS[u].cost; SFX.coin(); shopRefresh(); }
     };
@@ -404,3 +415,41 @@ function soloEnd(won) {
   refreshTop();
 }
 function stopSolo() { clearInterval(warT); cancelAnimationFrame(warRaf); }
+
+/* ---------- Klassen mod computeren ---------- */
+const coopLeft = () => P.coop ? Math.max(0, Math.ceil((P.coop.left - (Date.now() - P.coopAt)) / 1000)) : 0;
+function coopBars() {
+  const c = P.coop; if (!c) return '';
+  const bar = (i, col) => `<span class="sbar" style="--tc:${col}"><i style="width:${Math.max(0, c.st[i]) / c.max[i] * 100}%"></i></span>`;
+  return `<div class="wm-row"><b style="color:#3a8fdc">Klassen</b>${bar(0, '#3a8fdc')}${bar(1, '#8d62cc')}<b style="color:#a98ae0">Computeren</b></div>`;
+}
+function coopStripHTML() {
+  const c = P.coop; if (!c) return '';
+  return `<div class="war-mini" id="coop-strip"><div class="coop-head"><b>Runde ${c.round}${c.rounds ? ' af ' + c.rounds : ''}</b><span>Butikken åbner om <b class="coop-left">${coopLeft()}</b> s</span></div>${coopBars()}</div>`;
+}
+function coopRefresh() {
+  const el = $('#coop-strip'); if (el) { const t = document.createElement('div'); t.innerHTML = coopStripHTML(); el.replaceWith(t.firstElementChild); }
+  if (P.coop && P.coop.sub === 'shop' && $('#coop-shop')) coopShopView();
+  if (P.coop && P.coop.sub === 'battle' && $('#coop-bars')) $('#coop-bars').innerHTML = coopBars();
+  refreshTop();
+}
+setInterval(() => { if (!P || !P.coop) return; $$('.coop-left').forEach(e => { e.textContent = coopLeft(); }); }, 500);
+function coopShopView() {
+  const c = P.coop, r = $('#play'), g = myGold();
+  const upg = UPGRADE_KEYS.map(k => {
+    const u = c.upg[k], def = UPGRADES[k], full = u.lvl >= u.max, need = u.cost - u.paid;
+    return `<div class="upg-card"><div><b>${esc(def.n)}</b>${u.max < 99 ? ` <span class="muted small">niveau ${u.lvl}/${u.max}</span>` : ''}<p class="small muted">${esc(def.desc)}</p></div>
+      <span class="ptrack"><i style="width:${full ? 100 : u.paid / u.cost * 100}%"></i></span>
+      <div class="row">${full ? '<span class="muted small">Fuld</span>' : `<span class="small">${u.paid} / ${u.cost}</span><button class="btn" data-upg="${k}" data-amt="50" type="button"${g < 1 ? ' disabled' : ''}>+50</button><button class="btn" data-upg="${k}" data-amt="${need}" type="button"${g < 1 ? ' disabled' : ''}>Betal resten${need > g ? ` (${g})` : ''}</button>`}</div></div>`;
+  }).join('');
+  r.innerHTML = `${topHTML()}<div class="war-mini" id="coop-shop"><div class="coop-head"><b>Butikken er åben</b><span>Kampen starter om <b class="coop-left">${coopLeft()}</b> s</span></div>${coopBars()}<p class="small muted">${c.queued} nye soldater er klar · hæren har ${c.army}</p></div>
+    <h3 class="sub-h">Soldater til næste kamp</h3>${shopHTML()}
+    <h3 class="sub-h">Fælles opgraderinger</h3><p class="small muted mt0">I betaler sammen. Når bjælken er fuld, bliver hele hæren stærkere.</p><div class="upg-list">${upg}</div>`;
+  bindShop();
+  $$('#play [data-upg]').forEach(b => { b.onclick = () => { P.client.send({ t: 'upg', k: b.dataset.upg, amt: +b.dataset.amt }); SFX.coin(); }; });
+}
+function coopBattleView() {
+  const c = P.coop;
+  $('#play').innerHTML = `${topHTML()}<div class="state plain pop" id="coop-battle"><h2>Kamp!</h2><p>Kig op på tavlen.</p><div id="coop-bars" style="width:100%">${coopBars()}</div><p class="small muted">Næste runde om <b class="coop-left">${coopLeft()}</b> s</p></div>`;
+  void c;
+}

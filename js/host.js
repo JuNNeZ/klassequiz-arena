@@ -6,7 +6,7 @@ import {
   shuffle, DUEL_HP, duelDamage, towerCoinsFor, towerSpent, validTowers, simWave, towerScore, CASTLE_HP, WAVE_FIRST_MS, WAVE_EVERY_MS,
   warGold, WAR_START_GOLD,
 } from './modes.js';
-import { newBattle, spawn, step, newAI, aiStep, drawBattle, frontline, UNITS, TICK_MS } from './war.js';
+import { newBattle, spawn, step, newAI, aiStep, drawBattle, frontline, UNITS, TICK_MS, MAX_UNITS, UPGRADES, UPGRADE_KEYS, coopBudget, coopWave, coopAIMods, coopStatues, upgFactor, COOP_WRONG_GOLD } from './war.js';
 import { lbHTML, podiumHTML, raceHTML, flip } from './ui.js';
 import { avatarSVG, AVATAR_COUNT } from './avatars.js';
 import { stage, enterGame, exitGame, setTimer, setNext, setCount, setStatus, body, teamStrip } from './stage.js';
@@ -61,7 +61,7 @@ function cleanup() { music.stop(); clearInterval(H && H.warT); cancelAnimationFr
 const everyone = () => [...H.players.values()].filter(p => !H.banned.has(p.sid));
 const active = () => everyone().filter(p => p.online);
 const val = p => H.mode === 'race' ? p.pos : H.mode === 'fish' ? p.kg : H.mode === 'duel' ? p.wins : H.mode === 'self' ? p.correct : p.score;
-const isWar = () => H.mode === 'war' || H.mode === 'warsolo';
+const isWar = () => H.mode === 'war' || H.mode === 'warsolo' || H.mode === 'warcoop';
 const sorted = () => everyone().sort((a, b) => val(b) - val(a) || b.correct - a.correct);
 function teamVal(i) { const m = everyone().filter(p => p.team === i); return m.length ? m.reduce((s, p) => s + p.score, 0) / m.length : 0; }
 function rankOf(p) { return sorted().indexOf(p) + 1; }
@@ -75,7 +75,7 @@ function meOf(p) {
   if (H.mode === 'fish') m.kg = p.kg;
   if (H.mode === 'tower') { m.coins = p.earned - towerSpent(p.towers); m.towers = p.towers; m.hp = p.hp; m.kills = p.kills; m.wave = p.wave; m.nextWave = Math.max(0, p.nextWave - Date.now()); }
   if (H.mode === 'duel') { m.wins = p.wins; m.duel = duelView(p); }
-  if (H.mode === 'war') { m.gold = p.gold; m.kills = p.kills; }
+  if (H.mode === 'war' || H.mode === 'warcoop') { m.gold = p.gold; m.kills = p.kills; m.spent = p.spent || 0; }
   if (H.mode === 'warsolo') { m.earned = p.earned; m.ws = p.ws; }
   if (H.mode === 'self') { m.left = p.queue.length; m.total = H.qs.length; m.done = p.done; }
   return m;
@@ -85,6 +85,8 @@ function stateFor(p) {
   if (H.teamsN) s.teams = TEAMS.slice(0, H.teamsN).map((t, i) => ({ n: t.n, score: teamVal(i) }));
   if (H.mode === 'race') s.goal = H.goal;
   if (H.mode === 'war' && H.phase === 'end') s.winTeam = H.warWinner;
+  if (H.mode === 'warcoop') s.coop = coopInfo();
+  if (H.mode === 'warcoop' && H.phase === 'end') s.coopWon = H.coopWon;
   if (H.phase === 'play' && H.endsAt) s.left = Math.max(0, H.endsAt - Date.now());
   return s;
 }
@@ -118,9 +120,11 @@ function onMsg(conn, d) {
   const p = H.players.get(conn._sid); if (!p || p.conn !== conn || H.banned.has(p.sid)) return;
   if (d.t === 'av' && Number.isInteger(d.av) && d.av >= 0 && d.av < AVATAR_COUNT) { p.av = d.av; dirty(); return; }
   if (H.phase !== 'play') return;
+  if (d.t === 'ans' && H.mode === 'warcoop' && H.coop && H.coop.sub !== 'q') return;
   if (d.t === 'ans' && d.n === p.n && p.cur != null && !p.answeredCur && Number.isInteger(d.c)) answer(p, d.c, Math.max(0, +d.ms || 0));
   else if (d.t === 'next' && p.answeredCur && !p.chestPending) nextQ(p);
   else if (d.t === 'chest' && p.chestPending && d.n === p.n) chest(p, Math.max(0, Math.min(2, +d.k || 0)));
+  else if (H.mode === 'warcoop' && (d.t === 'buy' || d.t === 'upg')) coopMsg(p, d);
   else if (d.t === 'buy' && H.mode === 'war' && UNITS[d.u] && H.battle) {
     const c = UNITS[d.u].cost;
     if (p.gold >= c && p.team >= 0 && spawn(H.battle, p.team, d.u, p.sid)) { p.gold -= c; send(p, { t: 'gold', me: meOf(p) }); if (d.u === 'giant') feed(p, `sendte en <b>kæmpe</b> i kamp`); }
@@ -180,7 +184,11 @@ function answer(p, c, ms) {
   else if (H.mode === 'tower') { if (ok) { fx.coins = towerCoinsFor(ms, dur); p.earned += fx.coins; } }
   else if (H.mode === 'duel') { if (ok) duelHit(p, fx); }
   else if (H.mode === 'self') { if (!ok) p.queue.push(p.curIdx); }
-  else if (isWar()) { if (ok) { fx.gold = warGold(ms, dur, p.streak); if (H.mode === 'war') p.gold += fx.gold; else p.earned += fx.gold; } }
+  else if (isWar()) {
+    if (ok) { fx.gold = warGold(ms, dur, p.streak); if (H.mode === 'warsolo') p.earned += fx.gold; else p.gold += fx.gold; }
+    else if (H.mode === 'warcoop' && H.coop) { H.coop.wrongs++; fx.penalty = COOP_WRONG_GOLD; }
+    if (H.mode === 'warcoop' && H.coop && ok) H.coop.right++;
+  }
   if (p.streak > 0 && p.streak % 5 === 0) feed(p, `har en stime på <b>${p.streak}</b> rigtige i træk`);
   send(p, { t: 'res', n: p.n, ok, c, correct: ci, fx, me: meOf(p), rank: rankOf(p) });
   dirty();
@@ -311,6 +319,7 @@ function start() {
   if (H.mode === 'duel') ensureDuels();
   if (H.mode === 'war') startWar();
   setNext('Afslut spillet', end);
+  if (H.mode === 'warcoop') { startCoop(); return; }
   dirty(); draw();
 }
 function tick() {
@@ -327,6 +336,7 @@ function draw() {
   if (!H || H.phase !== 'play') return;
   H.dirty = false; H.lastDraw = Date.now();
   if (H.mode === 'war') return drawWar();
+  if (H.mode === 'warcoop') return drawCoop();
   const n = everyone().length, a = active().length;
   setCount(`${MODES[H.mode].name} · ${a} ${a === 1 ? 'elev' : 'elever'} spiller${a < n ? ` (${n - a} væk)` : ''}`);
   setStatus(`Kode <b>${H.code}</b>, nye elever kan stadig deltage`);
@@ -360,6 +370,7 @@ function end() {
   H.phase = 'end'; setTimer(0); music.stop(); SFX.end(); setCount('Slut · ' + MODES[H.mode].name);
   clearInterval(H.warT); cancelAnimationFrame(H.warRaf);
   if (H.mode === 'war') return endWar();
+  if (H.mode === 'warcoop') return endCoop();
   const kg = H.mode === 'fish', unit = { gold: 'guld', fish: 'kg', race: 'felter', duel: 'sejre', self: 'rigtige' }[H.mode] || '';
   let html;
   if (H.teamsN) {
@@ -441,6 +452,133 @@ function endWar() {
   const rows = sorted().map(p => ({ n: p.nm, av: p.av, v: p.score, dot: TEAMS[p.team] ? TEAMS[p.team].c : '', sub: `${p.kills || 0} fældet` }));
   H.warWinner = tie ? null : w;
   body(`<div class="center">${tie ? '<h2 class="big-msg">Uafgjort!</h2><p class="muted">Begge statuer står stadig, og holdene gjorde lige meget skade.</p>' : `<h2 class="big-msg" style="color:${TEAMS[w].c}">Hold ${TEAMS[w].n} vinder!</h2><p class="muted">Hold ${TEAMS[w].n} ${how}</p>`}</div>${podiumHTML(rows, { unit: 'skade' })}${lbHTML(rows.slice(3, 12), { unit: 'skade' })}`);
+  setStatus(''); setNext('Luk spillet', quit);
+  broadcast();
+}
+
+/* ---------- Klassen mod computeren (rundebaseret) ---------- */
+const COOP_Q = FAST ? 12 : 40, COOP_SHOP = FAST ? 10 : 20, COOP_BATTLE = FAST ? 12 : 30;
+function startCoop() {
+  const n = everyone().length, [h1, h2] = coopStatues(n);
+  H.battle = newBattle({ hp: h1, hp2: h2 });
+  H.coop = { round: 0, rounds: H.minutes ? Math.max(2, Math.floor(H.minutes * 60 / (COOP_Q + COOP_SHOP + COOP_BATTLE))) : 99, sub: 'q', wrongs: 0, right: 0, queue: [], wave: [], upg: Object.fromEntries(UPGRADE_KEYS.map(k => [k, { lvl: 0, paid: 0 }])), f: upgFactor(n) };
+  setTimer(0); H.endsAt = 0;
+  spawn(H.battle, 0, 'sword', null); spawn(H.battle, 0, 'archer', null);
+  H.lastStep = performance.now();
+  const loop = () => {
+    if (!H || H.phase !== 'play') return;
+    const cv = document.getElementById('war-cv');
+    if (cv) drawBattle(cv, H.battle, { alpha: H.coop.sub === 'battle' ? Math.min(1, (performance.now() - H.lastStep) / TICK_MS) : 1, labels: ['Klassen', 'Computeren'], colors: ['#3a8fdc', '#8d62cc'] });
+    H.warRaf = requestAnimationFrame(loop);
+  };
+  H.warRaf = requestAnimationFrame(loop);
+  coopQ();
+}
+const upgCost = k => Math.round(UPGRADES[k].cost(H.coop.upg[k].lvl + 1) * (k === 'repair' ? 1 : H.coop.f));
+function coopInfo() {
+  const c = H.coop; if (!c) return null;
+  return { sub: c.sub, round: c.round, rounds: c.rounds === 99 ? 0 : c.rounds, left: Math.max(0, (c.subEnd || 0) - Date.now()), st: H.battle.statue.slice(), max: H.battle.maxHps.slice(),
+    upg: Object.fromEntries(UPGRADE_KEYS.map(k => [k, { lvl: c.upg[k].lvl, paid: c.upg[k].paid, cost: upgCost(k), max: UPGRADES[k].max }])),
+    queued: c.queue.length, army: H.battle.units.filter(u => u.team === 0).length, wrongs: c.wrongs, right: c.right };
+}
+function coopBroadcast() { everyone().forEach(p => send(p, { t: 'coop', c: coopInfo(), me: meOf(p) })); }
+function coopPhase(sub, sec) {
+  const c = H.coop; c.sub = sub; c.subEnd = Date.now() + sec * 1000;
+  setTimer(sec); H.onTimeUp = () => { if (!H || H.phase !== 'play') return; if (sub === 'q') coopShop(); else if (sub === 'shop') coopBattle(); else coopAfterBattle(); };
+  coopBroadcast(); dirty(); draw();
+}
+function coopQ() { const c = H.coop; c.round++; c.wrongs = 0; c.right = 0; coopPhase('q', COOP_Q); }
+function coopShop() { coopPhase('shop', COOP_SHOP); SFX.coin(); }
+function coopBattle() {
+  const c = H.coop, n = everyone().length;
+  c.wave = coopWave(coopBudget(c.round, n, c.wrongs), c.round);
+  c.waveSize = c.wave.length;
+  H.battle.mods[1] = coopAIMods(c.round);
+  c.quiet = 0;
+  coopPhase('battle', COOP_BATTLE); SFX.reveal();
+  clearInterval(H.warT);
+  H.warT = setInterval(coopTick, TICK_MS);
+}
+function coopTick() {
+  if (!H || H.phase !== 'play' || H.coop.sub !== 'battle') { clearInterval(H && H.warT); return; }
+  const b = H.battle, c = H.coop;
+  if (b.t % 3 === 0) {
+    if (c.queue.length) { const q = c.queue.shift(); spawn(b, 0, q.type, q.owner); }
+    if (c.wave.length) spawn(b, 1, c.wave.shift(), null);
+  }
+  step(b); H.lastStep = performance.now();
+  for (const ev of b.events) if (ev.k === 'kill' && ev.by && ev.type === 'giant') { const p = H.players.get(ev.by); if (p) feed(p, 'fældede en <b>kæmpe</b>'); }
+  everyone().forEach(p => { p.score = Math.round(b.dmg[p.sid] || 0); p.kills = b.kills[p.sid] || 0; });
+  if (b.winner >= 0) { clearInterval(H.warT); setTimeout(() => { if (H && H.phase === 'play') end(); }, 2500); return; }
+  const empty = !c.queue.length && !c.wave.length && (!b.units.some(u => u.team === 1) || !b.units.some(u => u.team === 0));
+  c.quiet = empty ? c.quiet + 1 : 0;
+  if (c.quiet > 30) { clearInterval(H.warT); coopAfterBattle(); return; }
+  if (b.t % 10 === 0) { coopBroadcast(); dirty(); }
+}
+function coopAfterBattle() {
+  clearInterval(H.warT);
+  const c = H.coop;
+  if (c.sub !== 'battle') return;
+  c.queue.forEach(q => spawn(H.battle, 0, q.type, q.owner)); c.queue = [];
+  if (H.battle.winner >= 0 || c.round >= c.rounds) return end();
+  coopQ();
+}
+function coopMsg(p, d) {
+  const c = H.coop; if (!c || c.sub !== 'shop') { send(p, { t: 'note', txt: 'Butikken er lukket lige nu', me: meOf(p) }); return; }
+  if (d.t === 'buy' && UNITS[d.u]) {
+    const cost = UNITS[d.u].cost;
+    if (p.gold < cost) return send(p, { t: 'note', txt: 'Ikke nok guld', me: meOf(p) });
+    if (H.battle.units.filter(u => u.team === 0).length + c.queue.length >= MAX_UNITS) return send(p, { t: 'note', txt: 'Hæren er fuld. Køb opgraderinger i stedet.', me: meOf(p) });
+    p.gold -= cost; p.spent = (p.spent || 0) + cost; c.queue.push({ type: d.u, owner: p.sid });
+    if (d.u === 'giant') feed(p, 'købte en <b>kæmpe</b>');
+  } else if (d.t === 'upg' && UPGRADES[d.k]) {
+    const u = c.upg[d.k], def = UPGRADES[d.k];
+    if (u.lvl >= def.max) return send(p, { t: 'note', txt: 'Opgraderingen er allerede fuld', me: meOf(p) });
+    if (d.k === 'repair' && H.battle.statue[0] >= H.battle.maxHps[0]) return send(p, { t: 'note', txt: 'Statuen er hel', me: meOf(p) });
+    const need = upgCost(d.k) - u.paid, amt = Math.min(p.gold, need, Math.max(1, +d.amt || need));
+    if (amt <= 0) return send(p, { t: 'note', txt: 'Ikke nok guld', me: meOf(p) });
+    p.gold -= amt; p.spent = (p.spent || 0) + amt; u.paid += amt;
+    if (u.paid >= upgCost(d.k)) {
+      u.paid = 0; u.lvl++;
+      if (d.k === 'repair') H.battle.statue[0] = Math.min(H.battle.maxHps[0], H.battle.statue[0] + 300);
+      else def.apply(H.battle.mods[0], u.lvl);
+      feed(p, `fuldførte <b>${esc(def.n)}</b>${def.max < 99 ? ' niveau ' + u.lvl : ''}`);
+      SFX.coin();
+    }
+  }
+  coopBroadcast(); dirty();
+}
+function drawCoop() {
+  const c = H.coop, n = everyone().length, a = active().length;
+  const title = { q: 'Svar på spørgsmål', shop: 'Køb soldater og opgraderinger', battle: 'Kamp!' }[c.sub];
+  setCount(`Runde ${c.round}${c.rounds < 99 ? ' af ' + c.rounds : ''} · ${title} · ${a} ${a === 1 ? 'elev' : 'elever'}${a < n ? ` (${n - a} væk)` : ''}`);
+  setStatus(`Kode <b>${H.code}</b>, nye elever kan stadig deltage`);
+  if (!document.getElementById('war-cv')) {
+    body(`<div class="war-stage"><div class="coop-banner" id="coop-banner"></div><canvas id="war-cv" class="war-cv" aria-label="Slagmarken"></canvas>
+      <div class="live"><div class="live-main"><div class="coop-upg" id="coop-upg"></div><h3 class="sub-h">Mest skade</h3><div id="war-lb"></div></div>
+      <aside class="live-side">${codeBox(true)}<h3 class="feed-h">Lige nu</h3><div class="feed2" id="war-feed"></div></aside></div></div>`);
+  }
+  const info = coopInfo();
+  const ban = document.getElementById('coop-banner');
+  ban.className = 'coop-banner ' + c.sub;
+  ban.innerHTML = c.sub === 'q'
+    ? `<b>Runde ${c.round}: svar på spørgsmål</b><span>${c.right} rigtige · ${c.wrongs} forkerte${c.wrongs ? ` · computeren har fået ${fmt(c.wrongs * COOP_WRONG_GOLD)} ekstra guld` : ''}</span>`
+    : c.sub === 'shop' ? `<b>Butikken er åben</b><span>${info.queued} soldater er klar til kamp · hæren har ${info.army}</span>`
+    : `<b>Kamp!</b><span>Klassen: ${H.battle.units.filter(u => u.team === 0).length} soldater · computeren: ${H.battle.units.filter(u => u.team === 1).length}${c.wave.length ? ` (+${c.wave.length} på vej)` : ''}</span>`;
+  document.getElementById('coop-upg').innerHTML = UPGRADE_KEYS.map(k => { const u = info.upg[k], full = u.lvl >= u.max; return `<div class="upg"><b>${esc(UPGRADES[k].n)}</b><span class="lv">${u.max < 99 ? `niveau ${u.lvl} af ${u.max}` : u.lvl ? `${u.lvl} gange` : ''}</span><span class="ptrack"><i style="width:${full ? 100 : u.paid / u.cost * 100}%"></i></span><small>${full ? 'Fuld' : `${fmt(u.paid)} / ${fmt(u.cost)} guld`}</small></div>`; }).join('');
+  const rows = sorted().slice(0, 8).map(p => ({ k: p.sid, n: p.nm, av: p.av, v: p.score, sub: `${p.correct}/${p.answered} rigtige · ${fmt(p.spent || 0)} guld brugt` }));
+  const lb = document.getElementById('war-lb');
+  flip(lb, () => { lb.innerHTML = lbHTML(rows, { unit: 'skade' }); });
+  document.getElementById('war-feed').innerHTML = H.feed.length ? H.feed.map(f => `<div class="fd">${avatarSVG(f.av, 26)}<span><b>${esc(f.n)}</b> ${f.html}</span></div>`).join('') : '<p class="muted small">Hver elev tjener guld på sine egne spørgsmål. I butikken køber I soldater og betaler sammen til opgraderinger.</p>';
+  teamStrip([{ n: 'Klassen', c: '#3a8fdc', score: Math.round(H.battle.statue[0] / H.battle.maxHps[0] * 100) }, { n: 'Computeren', c: '#8d62cc', score: Math.round(H.battle.statue[1] / H.battle.maxHps[1] * 100) }], '%');
+}
+function endCoop() {
+  const b = H.battle;
+  const won = b.winner === 0 || (b.winner < 0 && b.statue[1] / b.maxHps[1] < b.statue[0] / b.maxHps[0]);
+  H.coopWon = won;
+  const rows = sorted().map(p => ({ n: p.nm, av: p.av, v: p.score, sub: `${p.correct}/${p.answered} rigtige` }));
+  const how = b.winner === 0 ? 'Computerens statue faldt!' : b.winner === 1 ? 'Klassens statue faldt.' : won ? 'Klassen har mest statue tilbage.' : 'Computeren har mest statue tilbage.';
+  body(`<div class="center"><h2 class="big-msg" style="color:${won ? 'var(--good)' : 'var(--bad)'}">${won ? 'Klassen vandt!' : 'Computeren vandt'}</h2><p class="muted">${how} I spillede ${H.coop.round} ${H.coop.round === 1 ? 'runde' : 'runder'}.</p></div>${podiumHTML(rows, { unit: 'skade' })}${lbHTML(rows.slice(3, 12), { unit: 'skade' })}`);
   setStatus(''); setNext('Luk spillet', quit);
   broadcast();
 }

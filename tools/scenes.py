@@ -57,6 +57,7 @@ banners = ''.join(f'<path d="M{x} 150 V{90 - (x % 3) * 8}" stroke="#3a2a1a" stro
 spears = ''.join(f'<path d="M{x} 150 L{x + (10 if x < 600 else -10)} 96" stroke="#2a2018" stroke-width="3"/>' for x in range(30, 1200, 23) if not 470 < x < 730)
 S['war'] = svg('<path d="M0 150 Q200 112 420 140 T800 132 T1200 140 V180 H0 Z" fill="#3d5a2a"/>' + spears + banners + '<rect x="0" y="150" width="1200" height="30" fill="#2f4620"/>')
 S['warsolo'] = S['war']
+S['warcoop'] = S['war']
 
 print('/* Genereret af tools/scenes.py: silhuetter i bunden af hver spilverden */')
 for k, v in S.items():

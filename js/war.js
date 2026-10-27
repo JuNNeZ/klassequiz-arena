@@ -15,15 +15,19 @@ export const UNITS = {
 };
 export const UNIT_TYPES = ['sword', 'archer', 'spear', 'giant'];
 
-export function newBattle({ hp = 1000 } = {}) {
-  return { t: 0, units: [], next: 1, statue: [hp, hp], maxHp: hp, winner: -1, shots: [], dmg: {}, kills: {}, events: [] };
+export function newBattle({ hp = 1000, hp2 = null } = {}) {
+  const h2 = hp2 || hp;
+  return { t: 0, units: [], next: 1, statue: [hp, h2], maxHp: hp, maxHps: [hp, h2], winner: -1, shots: [], dmg: {}, kills: {}, events: [], mods: [newMods(), newMods()] };
 }
+export const newMods = () => ({ dmg: {}, range: {}, hp: 1 });
+const smax = (b, t) => (b.maxHps ? b.maxHps[t] : b.maxHp);
 
 export function spawn(b, team, type, owner = null, rand = Math.random) {
   const d = UNITS[type]; if (!d || b.winner >= 0) return false;
   if (b.units.filter(u => u.team === team).length >= MAX_UNITS) return false;
   const x = STATUE_X[team] + (team ? -1 : 1) * (30 + rand() * 20);
-  b.units.push({ id: b.next++, team, type, owner, x, px: x, lane: rand() * 2 - 1, hp: d.hp, cd: Math.floor(rand() * d.cd), phase: rand() * 6, atk: 0 });
+  const mhp = Math.round(d.hp * ((b.mods && b.mods[team].hp) || 1));
+  b.units.push({ id: b.next++, team, type, owner, x, px: x, lane: rand() * 2 - 1, hp: mhp, maxHp: mhp, cd: Math.floor(rand() * d.cd), phase: rand() * 6, atk: 0 });
   return true;
 }
 
@@ -36,7 +40,8 @@ export function step(b) {
   for (const u of alive) {
     u.px = u.x;
     if (u.hp <= 0) continue;
-    const d = UNITS[u.type], dir = u.team ? -1 : 1;
+    const d0 = UNITS[u.type], dir = u.team ? -1 : 1, m = b.mods ? b.mods[u.team] : null;
+    const d = m ? { ...d0, dmg: d0.dmg * (m.dmg[u.type] || 1), range: d0.range + (m.range[u.type] || 0) } : d0;
     if (u.cd > 0) u.cd--;
     if (u.atk > 0) u.atk--;
     // nærmeste fjende foran (eller lige ved siden af)
@@ -117,7 +122,7 @@ export function drawBattle(cv, b, { alpha = 1, colors = TEAM_C, labels = null, c
   for (let i = 0; i < 5; i++) { g.beginPath(); g.ellipse(W * (0.1 + i * 0.22), ground, W * 0.16, H * 0.14, 0, Math.PI, 0); g.fill(); }
   // statuer
   [0, 1].forEach(t => {
-    const x = STATUE_X[t] * sc, hpr = b.statue[t] / b.maxHp, h = H * 0.5;
+    const x = STATUE_X[t] * sc, hpr = Math.max(0, b.statue[t] / smax(b, t)), h = H * 0.5;
     g.fillStyle = '#c9c2b0'; g.fillRect(x - 16, ground - 14, 32, 14);
     g.fillStyle = hpr > 0 ? '#e9e2cf' : '#7a7468';
     g.beginPath(); g.moveTo(x - 11, ground - 14); g.lineTo(x - 6, ground - h); g.lineTo(x + 6, ground - h); g.lineTo(x + 11, ground - 14); g.closePath(); g.fill();
@@ -137,7 +142,7 @@ export function drawBattle(cv, b, { alpha = 1, colors = TEAM_C, labels = null, c
   for (const u of units) {
     const d = UNITS[u.type];
     const x = (u.px + (u.x - u.px) * alpha) * sc, y = ground - 2 + u.lane * H * 0.05;
-    drawStick(g, x, y, unitH * d.size, u.type, colors[u.team], u.team ? -1 : 1, u.phase + alpha * d.spd * 0.25, u.atk > 0, u.hp / d.hp);
+    drawStick(g, x, y, unitH * d.size, u.type, colors[u.team], u.team ? -1 : 1, u.phase + alpha * d.spd * 0.25, u.atk > 0, u.hp / (u.maxHp || d.hp));
   }
   // pile
   g.strokeStyle = '#f3e7c9'; g.lineWidth = 1.6;
@@ -185,3 +190,36 @@ export function unitIconSVG(type, color = 'currentColor') {
   const s = type === 'giant' ? 'transform="translate(-6 -6) scale(1.2)"' : '';
   return `<svg viewBox="0 0 60 60" width="44" height="44" aria-hidden="true"><g ${s} stroke="#141414" stroke-width="4" stroke-linecap="round" fill="none"><path d="M24 40 L18 56 M24 40 L30 56 M24 40 V22 M24 26 L32 32"/></g><g ${s}><circle cx="24" cy="14" r="7" fill="#141414"/><rect x="17" y="11" width="14" height="4" fill="${color}"/>${w}</g></svg>`;
 }
+
+/* ---------- Klassen mod computeren ---------- */
+export const UPGRADES = {
+  blade:  { n: 'Skarpere sværd',  desc: 'Sværd og spyd slår 25 % hårdere', max: 3, cost: l => 300 * l, apply: (m, l) => { m.dmg.sword = 1 + 0.25 * l; m.dmg.spear = 1 + 0.25 * l; } },
+  armor:  { n: 'Rustning',        desc: 'Alle soldater får 20 % mere liv', max: 3, cost: l => 350 * l, apply: (m, l) => { m.hp = 1 + 0.2 * l; } },
+  bows:   { n: 'Langbuer',        desc: 'Bueskytter skyder længere og hårdere', max: 3, cost: l => 300 * l, apply: (m, l) => { m.dmg.archer = 1 + 0.25 * l; m.range.archer = 30 * l; } },
+  giants: { n: 'Kæmpekraft',      desc: 'Kæmper slår 30 % hårdere', max: 3, cost: l => 400 * l, apply: (m, l) => { m.dmg.giant = 1 + 0.3 * l; } },
+  repair: { n: 'Reparér statuen', desc: 'Statuen får 300 liv tilbage', max: 99, cost: () => 250 },
+};
+export const UPGRADE_KEYS = Object.keys(UPGRADES);
+// Computerens guld til en runde: vokser med runden og klassens størrelse; forkerte svar giver ekstra
+export const coopBudget = (round, players, wrongs) => Math.round(Math.max(3, players) * (100 + round * 75) + wrongs * 45);
+// Opgraderinger koster mere i store klasser (eleverne betaler sammen)
+export const upgFactor = players => Math.min(2.5, Math.max(0.6, players / 8));
+export const COOP_WRONG_GOLD = 45;
+export function coopWave(budget, round, rand = Math.random) {
+  const opts = round < 2 ? ['sword', 'sword', 'archer'] : round < 4 ? ['sword', 'archer', 'spear', 'sword', 'archer'] : ['sword', 'archer', 'spear', 'giant', 'archer', 'spear'];
+  const out = []; let g = budget, guard = 0;
+  while (g >= 100 && guard++ < 200) {
+    const t = opts[Math.floor(rand() * opts.length)];
+    if (UNITS[t].cost <= g) { out.push(t); g -= UNITS[t].cost; }
+  }
+  return out;
+}
+// Computeren opgraderer selv lidt efterhånden
+export function coopAIMods(round) {
+  const m = newMods(), l = Math.min(3, round - 1);
+  if (l > 0) { UPGRADES.blade.apply(m, l); UPGRADES.bows.apply(m, l); UPGRADES.armor.apply(m, Math.min(3, Math.floor(l * 0.7))); }
+  if (round > 4) m.hp += 0.1 * (round - 4);
+  return m;
+}
+
+export const coopStatues = n => [1800 + 120 * Math.max(3, n), 2200 + 220 * Math.max(3, n)];
