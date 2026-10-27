@@ -8,6 +8,8 @@ export const MODES = {
   fish:    { name: 'Fiskeri',     desc: 'Rigtigt svar = kast snøren. Stime giver held. Tungeste fangst vinder.', live: true, board: true, boardTeams: true, unit: 'kg' },
   tower:   { name: 'Tårnforsvar', desc: 'Tjen mønter, byg tårne og stop monsterbølgerne.', live: true, board: false, unit: 'point' },
   duel:    { name: 'Duel',        desc: 'Rigtige svar rammer din modstander. Vind dueller og få en ny.', live: true, board: false, unit: 'sejre' },
+  war:     { name: 'Pindekrig',      desc: 'Rød mod Blå. Rigtige svar giver guld til soldater, og slaget kører live på tavlen.', live: true, board: false, liveTeams: true, fixedTeams: 2, unit: 'skade' },
+  warsolo: { name: 'Pindekrig solo', desc: 'Hver elev fører sin egen hær mod computeren. Vind slag og ryk op.', live: true, board: false, unit: 'point' },
   self:    { name: 'Selvstudie',  desc: 'Eget tempo. Forkerte spørgsmål kommer igen, til alt sidder.', live: true, board: false, unit: '' },
 };
 
@@ -192,3 +194,7 @@ export const fishLuck = (streak, ms, durMs) => Math.min(1, 0.12 * Math.min(strea
 export const DUEL_HP = 10;
 export const duelDamage = (streak, rand = R) => 2 + (streak >= 3 ? 1 : 0) + (rand() < 0.3 ? 1 : 0);
 export const WAVE_FIRST_MS = 45000, WAVE_EVERY_MS = 40000;
+
+/* Pindekrig */
+export const warGold = (ms, durMs, streak) => 80 + Math.round(70 * (1 - Math.min(Math.max(ms, 0), durMs) / durMs)) + Math.min(Math.max(streak - 1, 0), 4) * 15;
+export const WAR_START_GOLD = 150;

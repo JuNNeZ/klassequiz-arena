@@ -150,7 +150,7 @@ function opt() {
 function syncSetup() {
   const o = opt(), m = MODES[o.mode];
   $$('#modes input').forEach(i => { const md = MODES[i.value]; i.disabled = o.where === 'board' && !md.board; });
-  $('#teams-wrap').hidden = !((o.where === 'board' && m.boardTeams) || (o.where === 'live' && m.liveTeams));
+  $('#teams-wrap').hidden = !((o.where === 'board' && m.boardTeams) || (o.where === 'live' && m.liveTeams && !m.fixedTeams));
   $('#timer-wrap').hidden = o.where !== 'board';
   $('#len-wrap').hidden = o.where !== 'live';
   $('#shufq-wrap').hidden = o.where !== 'board';

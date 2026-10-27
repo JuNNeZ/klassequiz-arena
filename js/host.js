@@ -4,7 +4,9 @@ import { $$, esc, SFX, cleanName, fmt } from './util.js';
 import {
   MODES, TEAMS, prepQuestions, correctIdx, speedPoints, streakBonus, rollChest, liveRaceGoal, liveRaceSteps, rollFish, fishLuck, fmtKg,
   shuffle, DUEL_HP, duelDamage, towerCoinsFor, towerSpent, validTowers, simWave, towerScore, CASTLE_HP, WAVE_FIRST_MS, WAVE_EVERY_MS,
+  warGold, WAR_START_GOLD,
 } from './modes.js';
+import { newBattle, spawn, step, newAI, aiStep, drawBattle, frontline, UNITS, TICK_MS } from './war.js';
 import { lbHTML, podiumHTML, raceHTML, flip } from './ui.js';
 import { avatarSVG, AVATAR_COUNT } from './avatars.js';
 import { stage, enterGame, exitGame, setTimer, setNext, setCount, setStatus, body, teamStrip } from './stage.js';
@@ -21,7 +23,7 @@ export async function startHost(quiz, o) {
   const qs = prepQuestions(quiz, { shufA: o.shufA });
   H = {
     kind: 'host', quiz, mode: o.mode, qs, minutes: o.len, phase: 'opening', code: '',
-    players: new Map(), banned: new Set(), feed: [], teamsN: MODES[o.mode].liveTeams ? o.teams : 0,
+    players: new Map(), banned: new Set(), feed: [], teamsN: MODES[o.mode].fixedTeams || (MODES[o.mode].liveTeams ? o.teams : 0),
     goal: liveRaceGoal(o.len || 5), lastDraw: 0, dirty: true,
   };
   enterGame(H, quiz.title);
@@ -53,12 +55,13 @@ export async function startHost(quiz, o) {
   H.phase = 'lobby';
   lobby();
 }
-function cleanup() { music.stop(); try { H && H.peer && H.peer.destroy(); } catch (e) { /* */ } H = null; }
+function cleanup() { music.stop(); clearInterval(H && H.warT); cancelAnimationFrame(H && H.warRaf); try { H && H.peer && H.peer.destroy(); } catch (e) { /* */ } H = null; }
 
 /* ---------- hjælpere ---------- */
 const everyone = () => [...H.players.values()].filter(p => !H.banned.has(p.sid));
 const active = () => everyone().filter(p => p.online);
 const val = p => H.mode === 'race' ? p.pos : H.mode === 'fish' ? p.kg : H.mode === 'duel' ? p.wins : H.mode === 'self' ? p.correct : p.score;
+const isWar = () => H.mode === 'war' || H.mode === 'warsolo';
 const sorted = () => everyone().sort((a, b) => val(b) - val(a) || b.correct - a.correct);
 function teamVal(i) { const m = everyone().filter(p => p.team === i); return m.length ? m.reduce((s, p) => s + p.score, 0) / m.length : 0; }
 function rankOf(p) { return sorted().indexOf(p) + 1; }
@@ -72,6 +75,8 @@ function meOf(p) {
   if (H.mode === 'fish') m.kg = p.kg;
   if (H.mode === 'tower') { m.coins = p.earned - towerSpent(p.towers); m.towers = p.towers; m.hp = p.hp; m.kills = p.kills; m.wave = p.wave; m.nextWave = Math.max(0, p.nextWave - Date.now()); }
   if (H.mode === 'duel') { m.wins = p.wins; m.duel = duelView(p); }
+  if (H.mode === 'war') { m.gold = p.gold; m.kills = p.kills; }
+  if (H.mode === 'warsolo') { m.earned = p.earned; m.ws = p.ws; }
   if (H.mode === 'self') { m.left = p.queue.length; m.total = H.qs.length; m.done = p.done; }
   return m;
 }
@@ -79,6 +84,7 @@ function stateFor(p) {
   const s = { t: 'state', phase: H.phase, mode: H.mode, title: H.quiz.title, code: H.code, me: meOf(p), rank: rankOf(p), n: everyone().length };
   if (H.teamsN) s.teams = TEAMS.slice(0, H.teamsN).map((t, i) => ({ n: t.n, score: teamVal(i) }));
   if (H.mode === 'race') s.goal = H.goal;
+  if (H.mode === 'war' && H.phase === 'end') s.winTeam = H.warWinner;
   if (H.phase === 'play' && H.endsAt) s.left = Math.max(0, H.endsAt - Date.now());
   return s;
 }
@@ -115,6 +121,16 @@ function onMsg(conn, d) {
   if (d.t === 'ans' && d.n === p.n && p.cur != null && !p.answeredCur && Number.isInteger(d.c)) answer(p, d.c, Math.max(0, +d.ms || 0));
   else if (d.t === 'next' && p.answeredCur && !p.chestPending) nextQ(p);
   else if (d.t === 'chest' && p.chestPending && d.n === p.n) chest(p, Math.max(0, Math.min(2, +d.k || 0)));
+  else if (d.t === 'buy' && H.mode === 'war' && UNITS[d.u] && H.battle) {
+    const c = UNITS[d.u].cost;
+    if (p.gold >= c && p.team >= 0 && spawn(H.battle, p.team, d.u, p.sid)) { p.gold -= c; send(p, { t: 'gold', me: meOf(p) }); if (d.u === 'giant') feed(p, `sendte en <b>kæmpe</b> i kamp`); }
+    else send(p, { t: 'note', txt: p.gold < c ? 'Ikke nok guld endnu' : 'Hæren er fuld lige nu', me: meOf(p) });
+  }
+  else if (d.t === 'ws' && H.mode === 'warsolo') {
+    const ws = { stage: Math.max(1, Math.min(99, +d.stage || 1)), wins: Math.max(0, +d.wins || 0), dmg: Math.max(0, +d.dmg || 0), losses: Math.max(0, +d.losses || 0) };
+    if (p.ws && ws.wins > p.ws.wins) feed(p, `vandt slag ${ws.wins}`);
+    p.ws = ws; p.score = ws.wins * 500 + Math.round(ws.dmg); dirty();
+  }
   else if (d.t === 'build' && H.mode === 'tower' && validTowers(d.towers)) {
     const tw = d.towers.map(t => ({ slot: t.slot, type: t.type, lvl: t.lvl }));
     if (towerSpent(tw) <= p.earned) { p.towers = tw; sendState(p); dirty(); }
@@ -126,7 +142,7 @@ function newPlayer(sid, nm, team) {
     queue: [], cur: null, curIdx: -1, n: 0, answeredCur: false, chestPending: false, qStart: 0,
     correct: 0, answered: 0, streak: 0, best: 0, score: 0, pos: 0, kg: 0, catches: 0,
     earned: 0, towers: [], hp: CASTLE_HP, kills: 0, wave: 0, nextWave: 0,
-    wins: 0, duel: null, done: false };
+    wins: 0, duel: null, done: false, gold: WAR_START_GOLD, ws: null };
 }
 function qMsg(i) { const q = H.qs[i]; return { text: q.q, opts: q.opts.map(x => x.t), img: q.img || null, multi: correctIdx(q).length > 1, t: q.t }; }
 
@@ -164,6 +180,7 @@ function answer(p, c, ms) {
   else if (H.mode === 'tower') { if (ok) { fx.coins = towerCoinsFor(ms, dur); p.earned += fx.coins; } }
   else if (H.mode === 'duel') { if (ok) duelHit(p, fx); }
   else if (H.mode === 'self') { if (!ok) p.queue.push(p.curIdx); }
+  else if (isWar()) { if (ok) { fx.gold = warGold(ms, dur, p.streak); if (H.mode === 'war') p.gold += fx.gold; else p.earned += fx.gold; } }
   if (p.streak > 0 && p.streak % 5 === 0) feed(p, `har en stime på <b>${p.streak}</b> rigtige i træk`);
   send(p, { t: 'res', n: p.n, ok, c, correct: ci, fx, me: meOf(p), rank: rankOf(p) });
   dirty();
@@ -292,6 +309,7 @@ function start() {
   if (H.minutes) { setTimer(H.minutes * 60); H.endsAt = Date.now() + H.minutes * 60000; H.onTimeUp = end; }
   everyone().forEach(startPlayer);
   if (H.mode === 'duel') ensureDuels();
+  if (H.mode === 'war') startWar();
   setNext('Afslut spillet', end);
   dirty(); draw();
 }
@@ -308,11 +326,12 @@ function tick() {
 function draw() {
   if (!H || H.phase !== 'play') return;
   H.dirty = false; H.lastDraw = Date.now();
+  if (H.mode === 'war') return drawWar();
   const n = everyone().length, a = active().length;
   setCount(`${MODES[H.mode].name} · ${a} ${a === 1 ? 'elev' : 'elever'} spiller${a < n ? ` (${n - a} væk)` : ''}`);
   setStatus(`Kode <b>${H.code}</b>, nye elever kan stadig deltage`);
   const rows = sorted();
-  const unit = { gold: 'guld', fish: 'kg', race: 'felter', duel: 'sejre', self: 'rigtige' }[H.mode] || '';
+  const unit = { gold: 'guld', fish: 'kg', race: 'felter', duel: 'sejre', self: 'rigtige', war: 'skade' }[H.mode] || '';
   const R = p => ({ k: p.sid, n: p.nm, av: p.av, v: val(p), dot: p.team >= 0 ? TEAMS[p.team].c : '', sub: sub(p) });
   let main;
   if (H.mode === 'race') main = raceHTML(rows.slice(0, 18).map(p => ({ n: p.nm, pos: p.pos, av: p.av })), H.goal) + (rows.length > 18 ? `<p class="muted center">+ ${rows.length - 18} flere</p>` : '');
@@ -330,6 +349,8 @@ function draw() {
 function sub(p) {
   if (H.mode === 'tower') return `${p.hp} ♥ · ${p.kills} monstre`;
   if (H.mode === 'duel') return `${p.correct} rigtige`;
+  if (H.mode === 'war') return `${p.kills || 0} fældet`;
+  if (H.mode === 'warsolo') return p.ws ? `slag ${p.ws.stage}` : 'slag 1';
   if (H.mode === 'fish') return `${p.catches} fisk`;
   return p.streak >= 3 ? `stime ${p.streak}` : `${p.correct}/${p.answered}`;
 }
@@ -337,6 +358,8 @@ function sub(p) {
 function end() {
   if (!H || H.phase === 'end' || H.phase === 'closed') return;
   H.phase = 'end'; setTimer(0); music.stop(); SFX.end(); setCount('Slut · ' + MODES[H.mode].name);
+  clearInterval(H.warT); cancelAnimationFrame(H.warRaf);
+  if (H.mode === 'war') return endWar();
   const kg = H.mode === 'fish', unit = { gold: 'guld', fish: 'kg', race: 'felter', duel: 'sejre', self: 'rigtige' }[H.mode] || '';
   let html;
   if (H.teamsN) {
@@ -356,4 +379,68 @@ function quit() {
   if (!H) return exitGame();
   H.phase = 'closed'; broadcast();
   setTimeout(() => exitGame(), 400);
+}
+
+/* ---------- Pindekrig: hold mod hold ---------- */
+function startWar() {
+  const n = everyone().length;
+  H.battle = newBattle({ hp: 600 + 120 * Math.max(2, n) });
+  H.ais = [newAI(2), newAI(2)];
+  [0, 1].forEach(t => { spawn(H.battle, t, 'sword'); spawn(H.battle, t, 'sword'); });
+  H.lastStep = performance.now();
+  H.warT = setInterval(warTick, TICK_MS);
+  const loop = () => {
+    if (!H || H.phase !== 'play') return;
+    const cv = document.getElementById('war-cv');
+    if (cv) drawBattle(cv, H.battle, { alpha: Math.min(1, (performance.now() - H.lastStep) / TICK_MS), labels: ['Hold Rød', 'Hold Blå'] });
+    H.warRaf = requestAnimationFrame(loop);
+  };
+  H.warRaf = requestAnimationFrame(loop);
+}
+function warTick() {
+  if (!H || H.phase !== 'play' || !H.battle) return;
+  const b = H.battle;
+  [0, 1].forEach(t => { if (!active().some(p => p.team === t)) aiStep(b, H.ais[t], t); });
+  step(b); H.lastStep = performance.now();
+  for (const ev of b.events) {
+    if (ev.k === 'kill' && ev.by && ev.type === 'giant') { const p = H.players.get(ev.by); if (p) feed(p, 'fældede en <b>kæmpe</b>'); }
+    if (ev.k === 'win') { SFX.end(); setTimeout(() => { if (H && H.phase === 'play') end(); }, 2500); }
+  }
+  everyone().forEach(p => { p.score = Math.round(b.dmg[p.sid] || 0); p.kills = b.kills[p.sid] || 0; });
+  if (b.t % 10 === 0) {
+    const front = frontline(b), st = b.statue.slice(), max = b.maxHp;
+    everyone().forEach(p => send(p, { t: 'war', st, max, front, mine: b.units.filter(u => u.owner === p.sid).length, me: meOf(p) }));
+    dirty();
+  }
+}
+function teamDmg(t) { return everyone().filter(p => p.team === t).reduce((s, p) => s + p.score, 0); }
+function drawWar() {
+  const n = everyone().length, a = active().length;
+  setCount(`Pindekrig · ${a} ${a === 1 ? 'elev' : 'elever'} kæmper${a < n ? ` (${n - a} væk)` : ''}`);
+  setStatus(`Kode <b>${H.code}</b>, nye elever kan stadig deltage`);
+  if (!document.getElementById('war-cv')) {
+    body(`<div class="war-stage"><canvas id="war-cv" class="war-cv" aria-label="Slagmarken"></canvas>
+      <div class="live"><div class="live-main"><div class="war-teams" id="war-teams"></div><h3 class="sub-h">Mest skade</h3><div id="war-lb"></div></div>
+      <aside class="live-side">${codeBox(true)}<h3 class="feed-h">Lige nu</h3><div class="feed2" id="war-feed"></div></aside></div></div>`);
+  }
+  const rows = sorted().slice(0, 8).map(p => ({ k: p.sid, n: p.nm, av: p.av, v: p.score, dot: TEAMS[p.team] ? TEAMS[p.team].c : '', sub: `${p.kills || 0} fældet` }));
+  const lb = document.getElementById('war-lb');
+  flip(lb, () => { lb.innerHTML = lbHTML(rows, { unit: 'skade' }); });
+  document.getElementById('war-teams').innerHTML = [0, 1].map(t => {
+    const ps = everyone().filter(p => p.team === t), units = H.battle.units.filter(u => u.team === t).length;
+    return `<div class="war-team" style="--tc:${TEAMS[t].c}"><b>Hold ${TEAMS[t].n}</b><span>${ps.length} ${ps.length === 1 ? 'elev' : 'elever'} · ${units} soldater · ${fmt(teamDmg(t))} skade</span></div>`;
+  }).join('');
+  document.getElementById('war-feed').innerHTML = H.feed.length ? H.feed.map(f => `<div class="fd">${avatarSVG(f.av, 26)}<span><b>${esc(f.n)}</b> ${f.html}</span></div>`).join('') : '<p class="muted small">Køb soldater på jeres egne skærme. Den første, der vælter statuen, vinder.</p>';
+  teamStrip([0, 1].map(t => ({ n: TEAMS[t].n, c: TEAMS[t].c, score: Math.round(H.battle.statue[t] / H.battle.maxHp * 100) })), '%');
+}
+function endWar() {
+  const b = H.battle;
+  const tie = b.winner < 0 && b.statue[0] === b.statue[1] && teamDmg(0) === teamDmg(1);
+  const w = b.winner >= 0 ? b.winner : (b.statue[0] === b.statue[1] ? (teamDmg(0) > teamDmg(1) ? 0 : 1) : (b.statue[0] > b.statue[1] ? 0 : 1));
+  const how = b.winner >= 0 ? 'væltede statuen!' : b.statue[0] === b.statue[1] ? 'gjorde mest skade.' : 'har mest af statuen tilbage.';
+  const rows = sorted().map(p => ({ n: p.nm, av: p.av, v: p.score, dot: TEAMS[p.team] ? TEAMS[p.team].c : '', sub: `${p.kills || 0} fældet` }));
+  H.warWinner = tie ? null : w;
+  body(`<div class="center">${tie ? '<h2 class="big-msg">Uafgjort!</h2><p class="muted">Begge statuer står stadig, og holdene gjorde lige meget skade.</p>' : `<h2 class="big-msg" style="color:${TEAMS[w].c}">Hold ${TEAMS[w].n} vinder!</h2><p class="muted">Hold ${TEAMS[w].n} ${how}</p>`}</div>${podiumHTML(rows, { unit: 'skade' })}${lbHTML(rows.slice(3, 12), { unit: 'skade' })}`);
+  setStatus(''); setNext('Luk spillet', quit);
+  broadcast();
 }

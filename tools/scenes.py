@@ -52,6 +52,12 @@ while x < 1200:
     x += w + 3
 S['self'] = svg(books + '<rect x="0" y="168" width="1200" height="12" fill="#6b4a2c"/>')
 
+# Slagmarken: bakker, bannere og lanser
+banners = ''.join(f'<path d="M{x} 150 V{90 - (x % 3) * 8}" stroke="#3a2a1a" stroke-width="4"/><path d="M{x} {90 - (x % 3) * 8} l{30 if x < 600 else -30} 8 l{-30 if x < 600 else 30} 8 z" fill="{"#e5574c" if x < 600 else "#3a8fdc"}"/>' for x in (80, 190, 300, 900, 1010, 1120))
+spears = ''.join(f'<path d="M{x} 150 L{x + (10 if x < 600 else -10)} 96" stroke="#2a2018" stroke-width="3"/>' for x in range(30, 1200, 23) if not 470 < x < 730)
+S['war'] = svg('<path d="M0 150 Q200 112 420 140 T800 132 T1200 140 V180 H0 Z" fill="#3d5a2a"/>' + spears + banners + '<rect x="0" y="150" width="1200" height="30" fill="#2f4620"/>')
+S['warsolo'] = S['war']
+
 print('/* Genereret af tools/scenes.py: silhuetter i bunden af hver spilverden */')
 for k, v in S.items():
     print(f'[data-world="{k}"]{{--scene:url("data:image/svg+xml,{quote(v, safe="")}")}}')

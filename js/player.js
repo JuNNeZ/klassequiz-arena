@@ -4,9 +4,10 @@ import { TEAMS, MODES, TOWERS, TOWER_TYPES, MAX_LVL, upgradeCost, towerSpent, si
 import { tilesHTML, questionHTML, chestsHTML, catchHTML, drawTowerField, slotAt } from './ui.js';
 import { avatarSVG, avatarName, AVATAR_COUNT } from './avatars.js';
 import { Client, p2pAvailable } from './net.js';
+import { UNITS, UNIT_TYPES, newBattle, spawn, step, newAI, aiStep, drawBattle, TICK_MS, unitIconSVG } from './war.js';
 
 export let P = null;
-let autoT = 0, clockT = 0, anim = 0;
+let autoT = 0, clockT = 0, anim = 0, warT = 0, warRaf = 0;
 const ROBOT_AV = 16;
 
 function sid() {
@@ -52,7 +53,7 @@ function join() {
 export function leave() {
   if (!P) return;
   try { P.client.close(); } catch (e) { /* */ }
-  P = null; clearTimeout(autoT); clearInterval(clockT); cancelAnimationFrame(anim);
+  P = null; clearTimeout(autoT); clearInterval(clockT); cancelAnimationFrame(anim); clearInterval(warT); cancelAnimationFrame(warRaf);
   $('#play').hidden = true; $('#play').innerHTML = ''; $('#join-form').hidden = false; document.body.classList.remove('in-game'); delete document.body.dataset.world;
 }
 
@@ -70,20 +71,23 @@ function onData(d) {
       if (d.left != null) P.endAt = Date.now() + d.left;
       if (d.me && Number.isInteger(d.me.av)) P.av = d.me.av;
       if (d.phase === 'play' && was === 'play') { if (!P.building && !P.wave) refreshTop(); return; }
-      if (d.phase === 'end' && was !== 'end') { SFX.end(); P.building = false; P.wave = null; }
+      if (d.phase === 'end' && was !== 'end') { SFX.end(); P.building = false; P.wave = null; stopSolo(); }
+      if (d.phase === 'play' && d.mode === 'warsolo' && !P.ws) startSolo();
+      if (d.phase === 'play' && d.mode === 'war' && !P.warLoop) P.warLoop = true;
       break;
     }
     case 'q': P.q = { n: d.n, ...d.q, t0: performance.now() }; P.view = 'q'; break;
     case 'res':
       if (!P.q || d.n !== P.q.n) return;
       P.res = d; (d.ok ? SFX.good : SFX.bad)();
+      if (d.ok && d.fx && d.fx.gold && P.s.mode === 'warsolo' && P.ws) P.ws.gold += d.fx.gold;
       if (d.ok && d.fx && d.fx.chest) P.view = 'chest';
       else if (d.ok && d.fx && d.fx.fish) { P.view = 'cast'; setTimeout(() => { if (P && P.view === 'cast') { P.view = 'res'; SFX.splash(); render(); auto(2200); } }, 1100); }
       else { P.view = 'res'; auto(d.ok ? 1300 : 2600); }
       break;
     case 'chestres':
       P.chest = d; P.view = 'chestres'; (d.d >= 0 ? SFX.coin : SFX.bad)(); auto(1900); break;
-    case 'note': banner(d.txt, 'bad'); refreshTop(); return;
+    case 'note': banner(d.txt, 'bad'); refreshTop(); shopRefresh(); return;
     case 'duel':
       if (d.ev === 'hit') banner(`${d.by} ramte dig for ${d.dmg}!`, 'bad');
       else if (d.ev === 'won') { banner(`Du vandt duellen mod ${d.vs}!`, 'good'); SFX.end(); }
@@ -95,6 +99,8 @@ function onData(d) {
       if (P.q && P.view === 'q' && !P.q.pausedAt) P.q.pausedAt = performance.now();
       P.building = false; clearTimeout(autoT); startWave(); return;
     case 'done': P.view = 'done'; break;
+    case 'war': P.war = d; warMini(); shopRefresh(); return;
+    case 'gold': SFX.coin(); shopRefresh(); refreshTop(); return;
     default: return;
   }
   render();
@@ -141,6 +147,8 @@ function statLine(me, mode, s) {
   if (mode === 'gold') return fmt(me.score) + ' guld';
   if (mode === 'duel') return `${me.wins} ${me.wins === 1 ? 'sejr' : 'sejre'}`;
   if (mode === 'self') return `${me.correct} rigtige`;
+  if (mode === 'war') return `${me.gold} guld`;
+  if (mode === 'warsolo') return P.ws ? `${Math.floor(P.ws.gold)} guld · slag ${P.ws.stage}` : '';
   return fmt(me.score) + ' point';
 }
 function topHTML() {
@@ -213,7 +221,7 @@ function lobbyView(s) {
 function questionView() {
   const q = P.q, s = P.s, r = root();
   const tower = s.mode === 'tower' ? `<div class="tw-bar"><span id="p-nextwave" class="muted small"></span><button class="btn" id="p-build" type="button">Byg tårne · ${P.me ? P.me.coins : 0} mønter</button></div>` : '';
-  r.innerHTML = `${topHTML()}${tower}<div class="tbar"><i id="p-tb" style="width:100%"></i></div>${questionHTML(q.text, { img: q.img, multi: q.multi, size: 'phone' })}${tilesHTML(q.opts, { buttons: true })}`;
+  r.innerHTML = `${topHTML()}${tower}${warHTML()}<div class="tbar"><i id="p-tb" style="width:100%"></i></div>${questionHTML(q.text, { img: isWarMode() ? null : q.img, multi: q.multi, size: 'phone' })}${tilesHTML(q.opts, { buttons: true })}`;
   if (q.sent) $$('#play .tile').forEach(x => { x.disabled = true; });
   $$('#play .tile').forEach(b => {
     b.onclick = () => {
@@ -223,6 +231,7 @@ function questionView() {
       P.client.send({ t: 'ans', n: q.n, c: +b.dataset.i, ms: Math.round(performance.now() - q.t0) });
     };
   });
+  bindShop();
   const bb = $('#p-build'); if (bb) bb.onclick = () => { P.building = true; if (!P.q.pausedAt) P.q.pausedAt = performance.now(); render(); };
   const dur = q.t * 1000;
   const step = () => {
@@ -246,8 +255,10 @@ function resultView() {
   if (d.ok && fx.coins) p = `+${fx.coins} mønter`;
   if (d.ok && fx.dmg) p = `Du ramte ${fx.vs} for ${fx.dmg}!`;
   if (!d.ok && s.mode === 'self') p = 'Spørgsmålet kommer igen senere.';
-  r.innerHTML = `${topHTML()}<div class="state ${d.ok ? 'good' : 'bad'} pop"><h2>${esc(h)}</h2>${p ? `<p>${esc(p)}</p>` : ''}${extra}${!d.ok && right.length ? `<p class="muted">Rigtigt svar: <b>${right.map(esc).join(' / ')}</b></p>` : ''}</div><div class="row center-row"><button class="btn primary big" id="p-next" type="button">Næste</button></div>`;
+  if (d.ok && fx.gold) p = `+${fx.gold} guld`;
+  r.innerHTML = `${topHTML()}${warHTML()}<div class="state ${d.ok ? 'good' : 'bad'} pop"><h2>${esc(h)}</h2>${p ? `<p>${esc(p)}</p>` : ''}${extra}${!d.ok && right.length ? `<p class="muted">Rigtigt svar: <b>${right.map(esc).join(' / ')}</b></p>` : ''}</div><div class="row center-row"><button class="btn primary big" id="p-next" type="button">Næste</button></div>`;
   $('#p-next').onclick = nextQ;
+  bindShop();
   clock();
 }
 
@@ -255,6 +266,8 @@ function endView(s) {
   const me = P.me || {}, r = root();
   let teamLine = '';
   if (s.teams && me.team >= 0) { const ts = s.teams.map((t, i) => ({ i, v: t.score })).sort((a, b) => b.v - a.v); teamLine = `<p>Hold ${esc(s.teams[me.team].n)} blev nr. ${ts.findIndex(x => x.i === me.team) + 1} af ${s.teams.length}</p>`; }
+  if (s.mode === 'war' && s.winTeam != null) teamLine = `<p><b>Hold ${esc(TEAMS[s.winTeam].n)} vandt slaget.</b> ${me.team === s.winTeam ? 'Det var jeres hold!' : ''}</p><p class="muted">Du fældede ${me.kills || 0} fjender.</p>`;
+  if (s.mode === 'warsolo' && P.ws) teamLine = `<p>Du vandt ${P.ws.wins} ${P.ws.wins === 1 ? 'slag' : 'slag'} og nåede slag ${P.ws.stage}.</p>`;
   r.innerHTML = `<div class="state ${s.rank === 1 && s.mode !== 'self' ? 'good' : ''} pop"><div class="lobby-av">${avatarSVG(P.av, 96)}</div><h2>${s.mode === 'self' ? 'Godt arbejde!' : s.rank === 1 ? 'Du vandt!' : 'Godt spillet!'}</h2>${s.mode !== 'self' ? `<p>Du blev nr. <b>${s.rank}</b> af ${s.n}</p>` : ''}<p class="muted">${esc(statLine(me, s.mode, s))} · ${me.correct}/${me.answered} rigtige svar</p>${teamLine}</div><div class="row center-row"><button class="btn" id="p-leave" type="button">Forlad spillet</button></div>`;
   $('#p-leave').onclick = leave;
 }
@@ -318,3 +331,76 @@ function startWave() {
   };
   anim = requestAnimationFrame(step);
 }
+
+/* ---------- Pindekrig ---------- */
+const isWarMode = () => P && P.s && (P.s.mode === 'war' || P.s.mode === 'warsolo');
+function myGold() { return P.s.mode === 'warsolo' ? Math.floor(P.ws ? P.ws.gold : 0) : ((P.me && P.me.gold) || 0); }
+function shopHTML() {
+  const g = myGold(), col = P.s.mode === 'war' ? ['#e5574c', '#3a8fdc'][(P.me && P.me.team) || 0] : '#3a8fdc';
+  return `<div class="war-shop" id="war-shop">${UNIT_TYPES.map(k => `<button class="unit-b" data-unit="${k}" type="button"${g < UNITS[k].cost ? ' disabled' : ''}>${unitIconSVG(k, col)}<b>${UNITS[k].n}</b><span>${UNITS[k].cost}</span></button>`).join('')}</div>`;
+}
+function warHTML() {
+  if (!isWarMode() || P.s.phase !== 'play') return '';
+  if (P.s.mode === 'warsolo') return `<canvas id="ws-cv" class="war-cv small" aria-label="Din slagmark"></canvas>${shopHTML()}`;
+  return `<div class="war-mini" id="war-mini">${warMiniInner()}</div>${shopHTML()}`;
+}
+function warMiniInner() {
+  const w = P.war; if (!w) return '<span class="muted small">Slaget begynder…</span>';
+  const me = P.me || {}, t = me.team >= 0 ? me.team : 0;
+  const bar = i => `<span class="sbar" style="--tc:${TEAMS[i].c}"><i style="width:${Math.max(0, w.st[i]) / w.max * 100}%"></i></span>`;
+  const f0 = Math.round(w.front[0] * 100), f1 = Math.round(w.front[1] * 100);
+  return `<div class="wm-row"><b style="color:${TEAMS[0].c}">Rød</b>${bar(0)}${bar(1)}<b style="color:${TEAMS[1].c}">Blå</b></div>
+    <div class="wm-field"><i class="wm-f0" style="width:${f0}%"></i><i class="wm-f1" style="width:${f1}%"></i></div>
+    <p class="small muted center">Du har ${w.mine} ${w.mine === 1 ? 'soldat' : 'soldater'} på slagmarken${t === 0 ? ' for Rød' : ' for Blå'} · ${me.kills || 0} fældet</p>`;
+}
+function warMini() { const m = $('#war-mini'); if (m) m.innerHTML = warMiniInner(); }
+function shopRefresh() {
+  const sh = $('#war-shop'); if (!sh || !isWarMode()) return;
+  const g = myGold();
+  sh.querySelectorAll('.unit-b').forEach(b => { b.disabled = g < UNITS[b.dataset.unit].cost; });
+  const top = $('#p-top'); if (top) refreshTop();
+}
+function bindShop() {
+  $$('#play .unit-b').forEach(b => {
+    b.onclick = () => {
+      const u = b.dataset.unit;
+      if (P.s.mode === 'war') { P.client.send({ t: 'buy', u }); return; }
+      const ws = P.ws; if (!ws || ws.gold < UNITS[u].cost) return;
+      if (spawn(ws.b, 0, u, 'me')) { ws.gold -= UNITS[u].cost; SFX.coin(); shopRefresh(); }
+    };
+  });
+}
+
+/* solo: eleven mod computeren, kører på elevens egen enhed */
+function startSolo() {
+  P.ws = { stage: 1, wins: 0, losses: 0, dmg: 0, gold: 150, b: newBattle({ hp: 300 }), ai: newAI(1), last: performance.now(), pause: 0 };
+  spawn(P.ws.b, 0, 'sword', 'me'); spawn(P.ws.b, 1, 'sword');
+  clearInterval(warT);
+  let n = 0;
+  warT = setInterval(() => {
+    const ws = P && P.ws; if (!ws) return;
+    if (ws.pause > 0) { ws.pause--; return; }
+    aiStep(ws.b, ws.ai, 1); step(ws.b); ws.last = performance.now();
+    if (ws.b.winner >= 0) soloEnd(ws.b.winner === 0);
+    if (++n % 10 === 0) shopRefresh();
+    if (n % 20 === 0) P.client.send({ t: 'ws', stage: ws.stage, wins: ws.wins, losses: ws.losses, dmg: Math.round(ws.dmg + (ws.b.dmg.me || 0)) });
+  }, TICK_MS);
+  const loop = () => {
+    if (!P || !P.ws) return;
+    const cv = $('#ws-cv');
+    if (cv) drawBattle(cv, P.ws.b, { alpha: Math.min(1, (performance.now() - P.ws.last) / TICK_MS), labels: ['Dig', 'Computeren · slag ' + P.ws.stage], compact: true, colors: ['#3a8fdc', '#8d62cc'] });
+    warRaf = requestAnimationFrame(loop);
+  };
+  warRaf = requestAnimationFrame(loop);
+}
+function soloEnd(won) {
+  const ws = P.ws;
+  ws.dmg += ws.b.dmg.me || 0;
+  if (won) { ws.wins++; banner(`Du vandt slag ${ws.stage}!`, 'good'); SFX.end(); ws.stage++; }
+  else { ws.losses++; banner('Din statue faldt. Prøv slaget igen!', 'bad'); SFX.bad(); }
+  ws.b = newBattle({ hp: 300 + (ws.stage - 1) * 40 }); ws.ai = newAI(ws.stage); ws.pause = 15;
+  spawn(ws.b, 0, 'sword', 'me'); spawn(ws.b, 1, 'sword');
+  P.client.send({ t: 'ws', stage: ws.stage, wins: ws.wins, losses: ws.losses, dmg: Math.round(ws.dmg) });
+  refreshTop();
+}
+function stopSolo() { clearInterval(warT); cancelAnimationFrame(warRaf); }

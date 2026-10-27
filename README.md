@@ -21,11 +21,13 @@ Gratis quizspil til undervisning, inspireret af Kahoot og Blooket. Kører som en
 | Fiskeri – rigtigt svar = kast snøren, tungeste fangst vinder | ✓ hold | ✓ |
 | Tårnforsvar – tjen mønter, byg tårne, stop monstrene | | ✓ |
 | Duel – to og to mod hinanden | | ✓ |
+| Pindekrig – Rød mod Blå: rigtige svar giver guld til soldater, slaget kører live på tavlen | | ✓ |
+| Pindekrig solo – hver elev fører sin hær mod computeren og rykker op slag for slag | | ✓ |
 | Selvstudie – eget tempo, læreren følger fremgangen | | ✓ |
 
 ## Musik
 
-Hver spiltype har sin egen pausemusik (Quizshow, Skattejagt, Stadion, Racerbane, Havnen, Borgen, Duel og Fokus), komponeret til spillet og afspillet direkte i browseren. Slå den til og fra på lærerskærmen.
+Hver spiltype har sin egen pausemusik (Quizshow, Skattejagt, Stadion, Racerbane, Havnen, Borgen, Duel, Slagmarken, Felttoget og Fokus), komponeret til spillet og afspillet direkte i browseren. Slå den til og fra på lærerskærmen.
 
 ## Quizzer og billeder
 

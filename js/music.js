@@ -21,6 +21,10 @@ export const THEMES = {
     k: 'x.......x.......', s: 'x.x.x.x.xxx.x.x.', h: '', rhythm: 'x.xxx...x.xxx...', seed: 9, snareSoft: true },
   duel: { name: 'Duel', bpm: 132, steps: 16, root: 57, scale: 'harm', prog: [0, 0, 5, 4], lead: 'sawtooth', cut: 2200, bass: 'sawtooth', bassPat: 'x..x..x.x..x..x.',
     k: 'x.......x.......', s: '....x.......x...', h: 'x.x.x.x.x.x.x.x.', rhythm: 'x.x.x.x.x...xxx.', seed: 13, stacc: true },
+  war: { name: 'Slagmarken', bpm: 108, steps: 16, root: 50, scale: 'minor', prog: [0, 5, 3, 4], lead: 'sawtooth', cut: 1700, bass: 'square', bassPat: 'x.x.x.x.x.x.xx.x',
+    k: 'x..x..x.x..x..x.', s: '....x.......x.xx', h: 'x.x.x.x.x.x.x.x.', rhythm: 'x..x..x.x...x.x.', seed: 17 },
+  warsolo: { name: 'Felttoget', bpm: 120, steps: 16, root: 52, scale: 'dorian', prog: [0, 6, 5, 4], lead: 'square', cut: 1900, bass: 'triangle', bassPat: 'x...x.x.x...x.x.',
+    k: 'x...x...x...x...', s: '....x.......x...', h: '..x...x...x...x.', rhythm: 'x.xx..x.x.x.x...', seed: 21 },
   self: { name: 'Fokus', bpm: 72, steps: 16, root: 64, scale: 'major', prog: [0, 5, 3, 4], lead: 'sine', cut: 1800, bass: 'sine', bassPat: 'x.......x.......',
     k: 'x.......x.......', s: '....x.......x...', h: '..x...x...x...x.', rhythm: 'x.....x...x.....', seed: 4, pad: true, swing: 0.12 },
 };
