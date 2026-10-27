@@ -10,7 +10,7 @@ export async function commonsSearch(query, limit = 12) {
   if (cache.has(key)) return cache.get(key);
   const p = new URLSearchParams({
     action: 'query', generator: 'search', gsrsearch: query + ' filetype:bitmap', gsrnamespace: '6', gsrlimit: String(limit),
-    prop: 'imageinfo', iiprop: 'url|extmetadata|size', iiextmetadatafilter: 'Artist|LicenseShortName', iiurlwidth: '800',
+    prop: 'imageinfo', iiprop: 'url|extmetadata|size', iiextmetadatafilter: 'Artist|LicenseShortName', iiurlwidth: '960',
     format: 'json', origin: '*',
   });
   let res;
