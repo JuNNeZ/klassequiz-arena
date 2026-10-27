@@ -5,7 +5,7 @@ import {
   MODES, TEAMS, prepQuestions, correctIdx, speedPoints, streakBonus, rollChest, liveRaceGoal, liveRaceSteps, rollFish, fishLuck, fmtKg,
   shuffle, DUEL_HP, duelDamage, towerCoinsFor, towerSpent, validTowers, simWave, towerScore, CASTLE_HP, WAVE_FIRST_MS, WAVE_EVERY_MS,
 } from './modes.js';
-import { lbHTML, podiumHTML, raceHTML, fishSVG } from './ui.js';
+import { lbHTML, podiumHTML, raceHTML, flip } from './ui.js';
 import { avatarSVG, AVATAR_COUNT } from './avatars.js';
 import { stage, enterGame, exitGame, setTimer, setNext, setCount, setStatus, body, teamStrip } from './stage.js';
 import { openHost } from './net.js';
@@ -313,7 +313,7 @@ function draw() {
   setStatus(`Kode <b>${H.code}</b>, nye elever kan stadig deltage`);
   const rows = sorted();
   const unit = { gold: 'guld', fish: 'kg', race: 'felter', duel: 'sejre', self: 'rigtige' }[H.mode] || '';
-  const R = p => ({ n: p.nm, av: p.av, v: val(p), dot: p.team >= 0 ? TEAMS[p.team].c : '', sub: sub(p) });
+  const R = p => ({ k: p.sid, n: p.nm, av: p.av, v: val(p), dot: p.team >= 0 ? TEAMS[p.team].c : '', sub: sub(p) });
   let main;
   if (H.mode === 'race') main = raceHTML(rows.slice(0, 18).map(p => ({ n: p.nm, pos: p.pos, av: p.av })), H.goal) + (rows.length > 18 ? `<p class="muted center">+ ${rows.length - 18} flere</p>` : '');
   else if (H.mode === 'self') main = rows.map(p => { const done = H.qs.length - p.queue.length - (p.cur != null && !p.done ? 1 : 0); return `<div class="prow"><span class="nm">${avatarSVG(p.av, 26)}${esc(p.nm)}${p.online ? '' : ' <span class="muted small">(væk)</span>'}</span><span class="ptrack"><i style="width:${p.done ? 100 : Math.max(0, done) / H.qs.length * 100}%"></i></span><span class="num small">${p.done ? 'Færdig · ' : ''}${p.correct}/${p.answered} rigtige</span></div>`; }).join('');
@@ -324,7 +324,8 @@ function draw() {
   }
   else main = lbHTML(rows.slice(0, 10).map(R), { unit, kg: H.mode === 'fish' }) + (rows.length > 10 ? `<p class="muted center">+ ${rows.length - 10} flere</p>` : '');
   const feedHTML = H.feed.length ? H.feed.map(f => `<div class="fd">${avatarSVG(f.av, 26)}<span><b>${esc(f.n)}</b> ${f.html}</span></div>`).join('') : '<p class="muted small">Her vises det vildeste, der sker undervejs.</p>';
-  body(`<div class="live"><div class="live-main">${main}</div><aside class="live-side">${codeBox(true)}<h3 class="feed-h">Lige nu</h3><div class="feed2">${feedHTML}</div></aside></div>`);
+  const g = document.getElementById('g-body');
+  flip(g, () => body(`<div class="live"><div class="live-main">${main}</div><aside class="live-side">${codeBox(true)}<h3 class="feed-h">Lige nu</h3><div class="feed2">${feedHTML}</div></aside></div>`));
 }
 function sub(p) {
   if (H.mode === 'tower') return `${p.hp} ♥ · ${p.kills} monstre`;

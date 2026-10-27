@@ -3,6 +3,7 @@ import { $, $$, esc, clone, newId, LET, toast } from './util.js';
 import { TIMES } from './csv.js';
 import { openImagePicker, autoSearch, keywords } from './images.js';
 import { show } from './stage.js';
+import { shapeSVG } from './ui.js';
 
 let ED = null, onSave = null, onLeave = null;
 const blankQ = () => ({ q: '', a: ['', '', '', ''], c: [0], t: 20 });
@@ -47,7 +48,7 @@ function render(bad = new Set()) {
       <div class="qed-fields">
         <textarea id="q${i}-q" data-f="q" rows="2" maxlength="300" placeholder="Skriv spørgsmålet">${esc(x.q)}</textarea>
         <div class="ans-grid">${[0, 1, 2, 3].map(j => `<div class="ans-row">
-          <span class="chip L${j}">${LET[j]}</span>
+          <span class="chip L${j}" aria-hidden="true">${shapeSVG(j)}</span>
           <input type="text" id="q${i}-a${j}" data-f="a" data-j="${j}" maxlength="120" value="${esc(x.a[j])}" placeholder="Svar ${j + 1}${j > 1 ? ' (valgfrit)' : ''}" aria-label="Svar ${LET[j]}">
           <label class="ok" for="q${i}-c${j}"><input type="checkbox" id="q${i}-c${j}" data-f="c" data-j="${j}"${x.c.includes(j) ? ' checked' : ''}> Rigtig</label>
         </div>`).join('')}</div>

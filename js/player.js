@@ -53,7 +53,7 @@ export function leave() {
   if (!P) return;
   try { P.client.close(); } catch (e) { /* */ }
   P = null; clearTimeout(autoT); clearInterval(clockT); cancelAnimationFrame(anim);
-  $('#play').hidden = true; $('#play').innerHTML = ''; $('#join-form').hidden = false; document.body.classList.remove('in-game');
+  $('#play').hidden = true; $('#play').innerHTML = ''; $('#join-form').hidden = false; document.body.classList.remove('in-game'); delete document.body.dataset.world;
 }
 
 /* ---------- beskeder fra læreren ---------- */
@@ -66,6 +66,7 @@ function onData(d) {
     case 'state': {
       const was = P.s && P.s.phase;
       P.s = d;
+      document.body.dataset.world = d.mode;
       if (d.left != null) P.endAt = Date.now() + d.left;
       if (d.me && Number.isInteger(d.me.av)) P.av = d.me.av;
       if (d.phase === 'play' && was === 'play') { if (!P.building && !P.wave) refreshTop(); return; }

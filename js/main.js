@@ -19,6 +19,7 @@ const find = id => all().find(q => q.id === id);
 /* ---------- navigation ---------- */
 function route() {
   if (stage.G || P) return;
+  delete document.body.dataset.world;
   const h = location.hash;
   if (h.startsWith('#ov=')) { openShared(h.slice(4)); return; }
   if (h === '#deltag') { stopSelf(); show('v-join'); setTimeout(() => $('#j-code').focus(), 50); return; }
@@ -29,22 +30,27 @@ const go = h => { if (location.hash === h) route(); else location.hash = h; };
 stage.onExit = () => go('#quizzer');
 
 /* ---------- bibliotek ---------- */
+const COVERS = ['classic', 'gold', 'fish', 'tower', 'race', 'duel', 'self', 'team'];
+const coverWorld = q => COVERS[[...(q.subject || q.title || '')].reduce((h, c) => h + c.charCodeAt(0), 0) % COVERS.length];
 function renderLib() {
   $('#lib-grid').innerHTML = all().map(q => {
     const imgs = q.questions.filter(x => x.img).length;
     const cover = q.questions.find(x => x.img);
     return `<article class="card" data-id="${esc(q.id)}">
-    ${cover ? `<div class="card-cover"><img src="${esc(cover.img.src)}" alt="" loading="lazy"></div>` : ''}
-    <div class="card-meta"><span class="tag">${esc(q.subject || 'Quiz')}</span>${q.grade ? `<span>${esc(q.grade)}</span>` : ''}${q.builtin ? '<span>Eksempel</span>' : ''}</div>
-    <h3>${esc(q.title || 'Uden titel')}</h3>
-    <p class="muted small">${q.questions.length} spørgsmål${imgs ? ` · ${imgs} med billede` : ''}</p>
-    <div class="card-actions">
-      <button class="btn primary" data-act="play" type="button">Spil</button>
-      <button class="btn" data-act="self" type="button">Øv selv</button>
-      <button class="btn ghost" data-act="edit" type="button">${q.builtin ? 'Kopiér og ret' : 'Rediger'}</button>
-      <button class="btn ghost" data-act="share" type="button">Del øvelink</button>
-      <button class="btn ghost" data-act="export" type="button">Eksportér</button>
-      ${q.builtin ? '' : '<button class="btn ghost danger" data-act="del" type="button">Slet</button>'}
+    <div class="card-cover" data-world="${coverWorld(q)}">${cover ? `<img src="${esc(cover.img.src)}" alt="" loading="lazy" onerror="this.remove()">` : ''}<span class="card-subject">${esc(q.subject || 'Quiz')}</span></div>
+    <div class="card-body">
+      <h3>${esc(q.title || 'Uden titel')}</h3>
+      <p class="muted small">${[q.grade, q.questions.length + ' spørgsmål', imgs ? imgs + ' med billede' : '', q.builtin ? 'eksempel' : ''].filter(Boolean).map(esc).join(', ')}</p>
+      <div class="card-actions">
+        <button class="btn primary" data-act="play" type="button">Spil</button>
+        <button class="btn" data-act="self" type="button">Øv selv</button>
+        <details class="more"><summary class="btn ghost" aria-label="Flere handlinger">Mere</summary><div class="menu">
+          <button data-act="edit" type="button">${q.builtin ? 'Kopiér og ret' : 'Rediger'}</button>
+          <button data-act="share" type="button">Del øvelink</button>
+          <button data-act="export" type="button">Eksportér</button>
+          ${q.builtin ? '' : '<button class="danger" data-act="del" type="button">Slet</button>'}
+        </div></details>
+      </div>
     </div></article>`;
   }).join('');
 }
@@ -57,7 +63,8 @@ async function onLibClick(e) {
   else if (act === 'edit') { openEditor(q, false); history.replaceState(null, '', '#rediger'); }
   else if (act === 'share') shareLink(q);
   else if (act === 'export') openIO('export', q);
-  else if (act === 'del') confirmClick(b, 'Tryk igen for at slette', async () => { await deleteQuiz(id); OWN = OWN.filter(x => x.id !== id); renderLib(); toast('Quizzen er slettet'); });
+  if (act !== 'del') { const d = b.closest('details'); if (d) d.open = false; }
+  if (act === 'del') confirmClick(b, 'Tryk igen for at slette', async () => { await deleteQuiz(id); OWN = OWN.filter(x => x.id !== id); renderLib(); toast('Quizzen er slettet'); });
 }
 async function saveQuiz(q) {
   q.updated = Date.now();
@@ -68,7 +75,7 @@ async function saveQuiz(q) {
 
 /* ---------- øv selv og øvelinks ---------- */
 function localSelf(q, shared) {
-  show('v-self');
+  show('v-self'); document.body.dataset.world = 'self';
   const root = $('#self-root');
   startSelf(root, q.title, selfQuestions(prepQuestions(q)), null);
   if (shared) root.insertAdjacentHTML('afterbegin', '');
@@ -155,7 +162,7 @@ function syncSetup() {
   else if (o.where === 'live') { note.textContent = 'Hver elev spiller i eget tempo på sin egen enhed, og tavlen viser den samlede stilling live. Eleverne går ind på siden og skriver koden. Intet login.'; note.hidden = false; }
 }
 function initSetup() {
-  $('#modes').innerHTML = Object.entries(MODES).map(([k, m], i) => `<label><input type="radio" name="mode" value="${k}" id="m-${k}"${i === 0 ? ' checked' : ''}><span><b>${m.name}</b><small>${m.desc}</small>${m.board ? '' : '<em>Kun live</em>'}</span></label>`).join('');
+  $('#modes').innerHTML = Object.entries(MODES).map(([k, m], i) => `<label><input type="radio" name="mode" value="${k}" id="m-${k}"${i === 0 ? ' checked' : ''}><span class="mode-card"><i class="mode-sw" data-world="${k}" aria-hidden="true"></i><b>${m.name}</b><small>${m.desc}</small>${m.board ? '' : '<em>Kun live</em>'}</span></label>`).join('');
   $('#setup').addEventListener('change', syncSetup);
   $('#setup-cancel').onclick = () => { $('#setup').hidden = true; };
   $('#setup-go').onclick = () => {
@@ -172,6 +179,7 @@ async function init() {
   initStage(); initImagePicker(); initSetup(); initJoin();
   initEditor(async q => { await saveQuiz(q); go('#quizzer'); renderLib(); }, () => go('#quizzer'));
   $('#lib-grid').addEventListener('click', onLibClick);
+  document.addEventListener('click', e => { $$('details.more[open]').forEach(d => { if (!d.contains(e.target)) d.open = false; }); });
   $('#b-new').onclick = () => { openEditor({ id: 'n' + Date.now().toString(36), title: '', subject: '', grade: '', questions: [{ q: '', a: ['', '', '', ''], c: [0], t: 20 }] }, true); history.replaceState(null, '', '#rediger'); };
   $('#b-import').onclick = () => openIO('import');
   $('#b-backup').onclick = () => { if (!OWN.length) { toast('Du har ingen egne quizzer endnu'); return; } saveFile('klassequiz-backup.json', JSON.stringify({ format: 'klassequiz-arena', version: 2, quizzes: OWN }), 'application/json'); };

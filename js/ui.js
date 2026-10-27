@@ -5,14 +5,24 @@ import { SLOTS, PATH_LEN, TOWERS, fmtKg } from './modes.js';
 import { avatarSVG } from './avatars.js';
 const avOr = (r, size) => r.av != null ? avatarSVG(r.av, size) : '';
 
+// Figurer på svarene, så de kan skelnes uden at læse og uden farvesyn
+const SHAPES = [
+  '<path d="M12 3 L22 20 H2 Z"/>',
+  '<path d="M12 2 L22 12 L12 22 L2 12 Z"/>',
+  '<circle cx="12" cy="12" r="10"/>',
+  '<rect x="3" y="3" width="18" height="18" rx="2"/>',
+];
+export const shapeSVG = i => `<svg class="shape" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">${SHAPES[i % 4]}</svg>`;
+
 export function tilesHTML(opts, st = {}) {
   const tag = st.buttons ? 'button' : 'div';
-  return '<div class="tiles">' + opts.map((t, i) => {
+  const short = opts.every(t => String(t).length <= 14) ? ' short' : '';
+  return `<div class="tiles${short}">` + opts.map((t, i) => {
     let cls = 'tile T' + i;
     if (st.reveal) cls += st.reveal.includes(i) ? ' right' : ' dim';
     if (st.picked === i) cls += ' picked';
     const extra = st.counts ? `<span class="cnt">${st.counts[i] || 0}</span>` : (st.reveal && st.reveal.includes(i) ? '<span class="mark">Rigtigt</span>' : '');
-    return `<${tag} class="${cls}" data-i="${i}"${tag === 'button' ? ' type="button"' : ''}><span class="lt">${LET[i]}</span><span class="tx">${esc(t)}</span>${extra}</${tag}>`;
+    return `<${tag} class="${cls}" data-i="${i}"${tag === 'button' ? ' type="button"' : ''}><span class="lt" aria-label="${LET[i]}">${shapeSVG(i)}</span><span class="tx">${esc(t)}</span>${extra}</${tag}>`;
   }).join('') + '</div>';
 }
 
@@ -25,7 +35,7 @@ export function questionHTML(text, { img, multi, size = 'stage', pop = false } =
 
 export function lbHTML(rows, { unit = '', kg = false } = {}) {
   const max = Math.max(1, ...rows.map(r => r.v));
-  return '<div class="lb">' + rows.map((r, i) => `<div class="lb-row${r.me ? ' me' : ''}"><span class="bar" style="width:${Math.max(0, r.v) / max * 100}%"></span><span class="rk">${i + 1}</span><span class="nm">${r.dot ? `<i class="dot" style="background:${r.dot}"></i>` : ''}${avOr(r, 30)}${esc(r.n)}${r.sub ? ` <span class="sub">${esc(r.sub)}</span>` : ''}</span><span class="vl">${kg ? fmtKg(r.v) : fmt(r.v)}${unit ? ' ' + unit : ''}</span></div>`).join('') + '</div>';
+  return '<div class="lb">' + rows.map((r, i) => `<div class="lb-row${r.me ? ' me' : ''}" data-k="${esc(r.k || r.n)}"><span class="bar" style="width:${Math.max(0, r.v) / max * 100}%"></span><span class="rk">${i + 1}</span><span class="nm">${r.dot ? `<i class="dot" style="background:${r.dot}"></i>` : ''}${avOr(r, 30)}${esc(r.n)}${r.sub ? ` <span class="sub">${esc(r.sub)}</span>` : ''}</span><span class="vl">${kg ? fmtKg(r.v) : fmt(r.v)}${unit ? ' ' + unit : ''}</span></div>`).join('') + '</div>';
 }
 
 export function podiumHTML(rows, { unit = '', kg = false } = {}) {
@@ -117,4 +127,17 @@ export function slotAt(cv, clientX) {
   let best = -1, bd = 1e9;
   SLOTS.forEach((s, i) => { const d = Math.abs(s - p); if (d < bd) { bd = d; best = i; } });
   return bd < 12 ? best : -1;
+}
+
+// Glidende omrokering: rækker med samme data-k flytter sig blødt til ny plads
+export function flip(container, render) {
+  const before = new Map();
+  container.querySelectorAll('[data-k]').forEach(el => before.set(el.dataset.k, el.getBoundingClientRect().top));
+  render();
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  container.querySelectorAll('[data-k]').forEach(el => {
+    const t0 = before.get(el.dataset.k); if (t0 == null) return;
+    const dy = t0 - el.getBoundingClientRect().top; if (Math.abs(dy) < 2) return;
+    el.animate([{ transform: `translateY(${dy}px)` }, { transform: 'translateY(0)' }], { duration: 450, easing: 'cubic-bezier(.2,.8,.2,1)' });
+  });
 }

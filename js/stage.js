@@ -16,6 +16,7 @@ export function show(id) {
 
 export function enterGame(G, title) {
   stage.G = G;
+  document.body.dataset.world = G.mode || 'classic';
   show('v-game');
   $('#g-title').textContent = title;
   $('#g-count').textContent = '';
@@ -29,7 +30,7 @@ export function exitGame() {
   clearInterval(TICK);
   const G = stage.G; stage.G = null;
   if (G && G.cleanup) G.cleanup();
-  wakeLock(false); music.stop();
+  wakeLock(false); music.stop(); delete document.body.dataset.world;
   if (stage.onExit) stage.onExit();
 }
 
