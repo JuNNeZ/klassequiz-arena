@@ -1,4 +1,4 @@
-import { $, $$, esc, toast, sound, lsSet, copyText, saveFile, confirmClick, SFX } from './util.js';
+import { $, $$, esc, toast, sound, lsSet, lsGet, copyText, saveFile, confirmClick, SFX } from './util.js';
 import { loadAll, putQuiz, deleteQuiz } from './store.js';
 import { csvToQuiz, quizToBlooketCSV, quizToJSON, jsonToQuizzes, encodeShare, decodeShare } from './csv.js';
 import { MODES, prepQuestions, selfQuestions } from './modes.js';
@@ -142,31 +142,37 @@ function exportAs(kind) {
 let SETUP = null;
 function openSetup(q) {
   SETUP = q; $('#setup-h').textContent = 'Start: ' + (q.title || 'quiz');
+  const last = lsGet('kqa.setup', null);
+  if (last && MODES[last.mode]) { $('#m-' + last.mode).checked = true; $(last.where === 'board' ? '#w-board' : '#w-live').checked = true; }
   $('#setup').hidden = false; syncSetup();
+  const sel = $('#modes input:checked'); if (sel) sel.closest('label').scrollIntoView({ block: 'nearest' });
 }
 function opt() {
   return { where: $('input[name=where]:checked').value, mode: $('input[name=mode]:checked').value, teams: +$('#o-teams').value, timer: $('#o-timer').checked, len: +$('#o-len').value, shufQ: $('#o-shufq').checked, shufA: $('#o-shufa').checked };
 }
 function syncSetup() {
-  const o = opt(), m = MODES[o.mode];
-  $$('#modes input').forEach(i => { const md = MODES[i.value]; i.disabled = o.where === 'board' && !md.board; });
+  let o = opt(); const m = MODES[o.mode];
+  // Spil, der kun findes live, skifter automatisk til Live
+  $('#w-board').disabled = !m.board;
+  if (!m.board && o.where === 'board') { $('#w-live').checked = true; o = opt(); }
+  $('#mode-desc').innerHTML = `<b>${m.name}:</b> ${m.desc}${m.board ? '' : ' <em>Spilles live på elevernes egne enheder.</em>'}`;
   $('#teams-wrap').hidden = !((o.where === 'board' && m.boardTeams) || (o.where === 'live' && m.liveTeams && !m.fixedTeams));
   $('#timer-wrap').hidden = o.where !== 'board';
   $('#len-wrap').hidden = o.where !== 'live';
   $('#shufq-wrap').hidden = o.where !== 'board';
   const note = $('#setup-note'), err = $('#setup-err'), go = $('#setup-go');
   note.hidden = true; err.hidden = true; go.disabled = false;
-  if (o.where === 'board' && !m.board) { err.textContent = `${m.name} spilles på elevernes egne enheder. Vælg Live.`; err.hidden = false; go.disabled = true; }
-  else if (o.where === 'live' && !p2pAvailable()) { err.textContent = 'Live kunne ikke indlæses. Genindlæs siden.'; err.hidden = false; go.disabled = true; }
-  else if (o.where === 'board' && m.boardTeams) { note.textContent = 'På tavlen spiller klassen på hold. Du markerer, hvilke hold der svarede rigtigt.'; note.hidden = false; }
-  else if (o.where === 'live') { note.textContent = 'Hver elev spiller i eget tempo på sin egen enhed, og tavlen viser den samlede stilling live. Eleverne går ind på siden og skriver koden. Intet login.'; note.hidden = false; }
+  if (o.where === 'live' && !p2pAvailable()) { err.textContent = 'Live kunne ikke indlæses. Genindlæs siden.'; err.hidden = false; go.disabled = true; }
+  else if (o.where === 'board' && m.boardTeams) { note.textContent = 'På tavlen spiller klassen på hold.'; note.hidden = false; }
+  go.textContent = o.where === 'live' ? 'Start live-spil' : 'Start på tavlen';
 }
 function initSetup() {
-  $('#modes').innerHTML = Object.entries(MODES).map(([k, m], i) => `<label><input type="radio" name="mode" value="${k}" id="m-${k}"${i === 0 ? ' checked' : ''}><span class="mode-card"><i class="mode-sw" data-world="${k}" aria-hidden="true"></i><b>${m.name}</b><small>${m.desc}</small>${m.board ? '' : '<em>Kun live</em>'}</span></label>`).join('');
+  $('#modes').innerHTML = Object.entries(MODES).map(([k, m], i) => `<label><input type="radio" name="mode" value="${k}" id="m-${k}"${i === 0 ? ' checked' : ''}><span class="mode-tile"><i class="mode-sw" data-world="${k}" aria-hidden="true"></i><b>${m.name}</b></span></label>`).join('');
   $('#setup').addEventListener('change', syncSetup);
   $('#setup-cancel').onclick = () => { $('#setup').hidden = true; };
   $('#setup-go').onclick = () => {
     const o = opt(); $('#setup').hidden = true;
+    lsSet('kqa.setup', { mode: o.mode, where: o.where });
     if (o.where === 'board') startBoard(SETUP, o, openSetup); else startHost(SETUP, o);
   };
   $('#setup').addEventListener('keydown', e => { if (e.key === 'Escape') $('#setup').hidden = true; });

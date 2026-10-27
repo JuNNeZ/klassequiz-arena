@@ -10,11 +10,11 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&display=swap">
-<link rel="stylesheet" href="css/style.css">
-<link rel="stylesheet" href="css/scenes.css">
+<link rel="stylesheet" href="css/style.css?v=202610271751">
+<link rel="stylesheet" href="css/scenes.css?v=202610271751">
 <script src="js/vendor/peerjs.min.js" defer></script>
 <script src="js/vendor/qrcode.js" defer></script>
-<script type="module" src="js/main.js"></script>
+<script type="module" src="js/main.js?v=202610271751"></script>
 </head>
 <body>
 <header class="top">
@@ -119,34 +119,35 @@
 
 <!-- START-DIALOG -->
 <div class="modal" id="setup" hidden role="dialog" aria-modal="true" aria-labelledby="setup-h">
-  <div class="sheet">
+  <div class="sheet setup-sheet">
     <h2 id="setup-h">Start quiz</h2>
     <fieldset>
+      <legend>Vælg spil</legend>
+      <div class="modes" id="modes"></div>
+      <p class="mode-desc" id="mode-desc"></p>
+    </fieldset>
+    <fieldset id="where-wrap">
       <legend>Hvor spiller I?</legend>
       <div class="choice two">
-        <label><input type="radio" name="where" value="board" id="w-board" checked><span><b>Tavle</b><small>Én skærm. Klassen svarer højt eller på hold.</small></span></label>
-        <label><input type="radio" name="where" value="live" id="w-live"><span><b>Live</b><small>Eleverne svarer på egne enheder med en kode. Intet login.</small></span></label>
+        <label><input type="radio" name="where" value="live" id="w-live" checked><span><b>Live</b><small>Eleverne spiller på egne enheder med en kode. Intet login.</small></span></label>
+        <label><input type="radio" name="where" value="board" id="w-board"><span><b>Tavle</b><small>Én skærm. Klassen svarer højt eller på hold.</small></span></label>
       </div>
-    </fieldset>
-    <fieldset>
-      <legend>Spiltype</legend>
-      <div class="choice four" id="modes"></div>
     </fieldset>
     <fieldset>
       <legend>Indstillinger</legend>
       <div class="opts">
+        <label id="len-wrap" for="o-len">Spillets længde
+          <select id="o-len"><option value="3">3 min</option><option value="5" selected>5 min</option><option value="8">8 min</option><option value="10">10 min</option><option value="15">15 min</option><option value="0">Til jeg stopper</option></select></label>
         <label id="teams-wrap" for="o-teams">Antal hold
           <select id="o-teams"><option>2</option><option selected>3</option><option>4</option><option>5</option><option>6</option></select></label>
         <label id="timer-wrap"><input type="checkbox" id="o-timer" checked> Nedtælling</label>
-        <label id="len-wrap" for="o-len">Spillets længde
-          <select id="o-len"><option value="3">3 min</option><option value="5" selected>5 min</option><option value="8">8 min</option><option value="10">10 min</option><option value="15">15 min</option><option value="0">Til jeg stopper</option></select></label>
         <label id="shufq-wrap"><input type="checkbox" id="o-shufq"> Bland spørgsmål</label>
         <label><input type="checkbox" id="o-shufa"> Bland svar</label>
       </div>
     </fieldset>
-    <p class="note" id="setup-note" hidden></p>
     <p class="err" id="setup-err" hidden></p>
-    <div class="row end">
+    <div class="sheet-foot">
+      <p class="note" id="setup-note" hidden></p>
       <button class="btn ghost" id="setup-cancel" type="button">Annullér</button>
       <button class="btn primary big" id="setup-go" type="button">Start spil</button>
     </div>

@@ -455,3 +455,20 @@ button.tile:active{transform:translateY(4px);box-shadow:0 2px 0 color-mix(in srg
 .upg-card{background:var(--board-2);border-radius:14px;padding:10px 12px;display:flex;flex-direction:column;gap:6px}
 .upg-card p{margin:2px 0 0}
 .upg-card .btn{min-height:38px;padding:4px 12px}
+
+/* startdialog: alle spil synlige som fliser, start-knap altid synlig */
+.setup-sheet{padding-bottom:0}
+.modes{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.modes label{position:relative;cursor:pointer}
+.modes input{position:absolute;opacity:0}
+.mode-tile{display:flex;flex-direction:column;border:3px solid transparent;border-radius:14px;overflow:hidden;background:var(--frame);height:100%;transition:transform .12s,border-color .15s}
+.mode-tile:hover{transform:translateY(-2px)}
+.mode-tile .mode-sw{display:block;height:54px;background:var(--w-bg3) var(--scene) center bottom/auto 150% repeat-x}
+.mode-tile b{padding:8px 10px;font-size:1rem;line-height:1.2}
+.modes input:checked + .mode-tile{border-color:var(--accent);background:var(--board-3)}
+.modes input:focus-visible + .mode-tile{outline:3px solid var(--accent);outline-offset:2px}
+.mode-desc{margin:4px 0 0;color:var(--dust);min-height:3em}
+.mode-desc b{color:var(--chalk)}
+.mode-desc em{font-style:normal;color:var(--accent)}
+.sheet-foot{position:sticky;bottom:0;display:flex;align-items:center;justify-content:flex-end;gap:10px;flex-wrap:wrap;background:var(--board-2);margin:0 -24px;padding:14px 24px 18px;border-top:1px solid var(--line);z-index:2}
+.sheet-foot .note{margin-right:auto}
