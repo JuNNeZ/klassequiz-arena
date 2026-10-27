@@ -29,13 +29,14 @@ function join() {
   if (!/^\d{4}$/.test(code)) { err.textContent = 'Skriv den firecifrede kode fra tavlen.'; err.hidden = false; return; }
   if (!name) { err.textContent = 'Skriv dit navn.'; err.hidden = false; return; }
   if (!p2pAvailable()) { err.textContent = 'Siden kunne ikke indlæse forbindelsen. Genindlæs siden.'; err.hidden = false; return; }
+  if (typeof window.RTCPeerConnection !== 'function') { err.textContent = 'Live-spil er slået fra i browseren på denne computer (WebRTC er blokeret). Brug en anden enhed, eller spørg IT.'; err.hidden = false; return; }
   lsSet('kqa.name', name);
   P = { code, name, sid: sid(), s: null, status: 'connecting', answered: {}, shown: {}, picked: {}, seen: {}, towers: [], buildWave: 0, sel: -1, animWave: 0, self: null };
   P.client = new Client(code, {
     onData: onData,
-    onStatus: st => {
+    onStatus: (st, diag) => {
       if (!P) return;
-      P.status = st;
+      P.status = st; P.diag = diag;
       if (st === 'open') P.client.send({ t: 'hello', sid: P.sid, nm: P.name });
       render();
     },
@@ -59,8 +60,13 @@ function onData(d) {
   }
 }
 
-function msg(h, p, cls) {
-  $('#play').innerHTML = `<div class="state ${cls || ''}"><h2>${esc(h)}</h2>${p ? `<p class="muted">${esc(p)}</p>` : ''}</div><div class="row center-row"><button class="btn ghost" id="p-leave" type="button">Forlad spillet</button></div>`;
+function diagHTML() {
+  const d = P && P.diag; if (!d) return '';
+  const mark = v => v === 'ok' ? '<b class="ok-c">✓</b>' : v === 'fail' ? '<b class="bad-c">✕</b>' : '<span class="muted">…</span>';
+  return `<ul class="diag"><li>${mark(d.server)} Forbindelse til netværket</li><li>${mark(d.host)} Forbindelse til lærerens skærm${d.tries > 1 ? ` · forsøg ${d.tries}` : ''}${d.relay ? ' · via relæ' : ''}</li></ul>`;
+}
+function msg(h, p, cls, withDiag) {
+  $('#play').innerHTML = `<div class="state ${cls || ''}"><h2>${esc(h)}</h2>${p ? `<p class="muted">${esc(p)}</p>` : ''}${withDiag ? diagHTML() : ''}</div><div class="row center-row"><button class="btn ghost" id="p-leave" type="button">Forlad spillet</button></div>`;
   $('#p-leave').onclick = leave;
 }
 function meBar(s) {
@@ -81,9 +87,9 @@ function render() {
   const s = P.s;
   if (P.kicked) return msg('Du er taget ud af spillet', 'Spørg din lærer, hvis det er en fejl.', 'bad');
   if (!s) {
-    if (P.status === 'notfound') return msg('Leder efter spillet…', `Fandt ikke et spil med koden ${P.code}. Tjek koden på tavlen. Vi prøver igen automatisk.`);
-    if (P.status === 'neterror' || P.status === 'error') return msg('Forbinder…', 'Netværket driller. Vi prøver igen automatisk.');
-    return msg('Forbinder…', `Kode ${P.code}`);
+    if (P.status === 'notfound') return msg('Leder efter spillet…', `Fandt ikke et spil med koden ${P.code}. Tjek koden på tavlen. Vi prøver igen automatisk.`, '', true);
+    if (P.status === 'neterror') return msg('Forbinder…', 'Netværket driller. Vi prøver igen automatisk.', '', true);
+    return msg('Forbinder…', `Kode ${P.code}`, '', true);
   }
   if (s.phase === 'closed') return msg('Spillet er slut', 'Læreren har lukket spillet. Tak for i dag!');
   const lostNote = P.status === 'lost' ? '<p class="note">Forbindelsen er tabt. Prøver igen…</p>' : '';

@@ -342,3 +342,6 @@ body.in-game .top nav{display:none}
 /* øvelink-bjælke */
 .shared-bar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;background:var(--board-2);border:1px solid var(--line-2);border-radius:12px;padding:8px 12px;margin:0 auto 16px;max-width:640px}
 .qhead.has-img:has(.qimg[hidden]){grid-template-columns:1fr}
+
+.diag{list-style:none;margin:6px 0 0;padding:0;text-align:left;font-size:.9rem;display:flex;flex-direction:column;gap:4px}
+.ok-c{color:var(--good)}.bad-c{color:var(--bad)}
