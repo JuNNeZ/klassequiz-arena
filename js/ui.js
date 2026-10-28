@@ -17,18 +17,20 @@ export const shapeSVG = i => `<svg class="shape" viewBox="0 0 24 24" aria-hidden
 export function tilesHTML(opts, st = {}) {
   const tag = st.buttons ? 'button' : 'div';
   const short = opts.every(t => String(t).length <= 14) ? ' short' : '';
-  return `<div class="tiles${short}">` + opts.map((t, i) => {
+  const longA = opts.some(t => String(t).length > 60) ? ' long-ans' : '';
+  return `<div class="tiles${short}${longA}">` + opts.map((t, i) => {
     let cls = 'tile T' + i;
     if (st.reveal) cls += st.reveal.includes(i) ? ' right' : ' dim';
     if (st.picked === i) cls += ' picked';
-    const extra = st.counts ? `<span class="cnt">${st.counts[i] || 0}</span>` : (st.reveal && st.reveal.includes(i) ? '<span class="mark">Rigtigt</span>' : '');
+    const extra = st.counts ? `<span class="cnt">${st.counts[i] || 0}</span>` : (st.reveal && st.reveal.includes(i) ? '<span class="tile-ok">Rigtigt</span>' : '');
     return `<${tag} class="${cls}" data-i="${i}"${tag === 'button' ? ' type="button"' : ''}><span class="lt" aria-label="${LET[i]}">${shapeSVG(i)}</span><span class="tx">${esc(t)}</span>${extra}</${tag}>`;
   }).join('') + '</div>';
 }
 
 // Spørgsmål + evt. billede. size: 'stage' (tavle) eller 'phone'
 export function questionHTML(text, { img, multi, size = 'stage', pop = false } = {}) {
-  const head = `${multi ? '<span class="multi">Flere svar er rigtige</span>' : ''}<h2 class="qtext${pop ? ' pop' : ''}">${esc(text)}</h2>`;
+  const len = String(text || '').length, fit = len > 170 ? ' xlong' : len > 90 ? ' long' : '';
+  const head = `${multi ? '<span class="multi">Flere svar er rigtige</span>' : ''}<h2 class="qtext${fit}${pop ? ' pop' : ''}">${esc(text)}</h2>`;
   if (!img || !img.src) return `<div class="qhead">${head}</div>`;
   return `<div class="qhead has-img ${size}"><div class="qtxt">${head}</div>${imgHTML(img)}</div>`;
 }

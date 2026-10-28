@@ -46,7 +46,7 @@ function reveal() {
     html += `<div class="teampick"><span class="lbl">Hvilke hold svarede rigtigt?</span>${G.teams.map((t, i) => `<button class="tbtn" data-t="${i}" aria-pressed="false" type="button"><i style="background:${t.c}"></i>${esc(t.n)}</button>`).join('')}</div>`;
   }
   const root = body(html);
-  $$('.tbtn', root).forEach(b => { b.onclick = () => { const i = +b.dataset.t; G.right.has(i) ? G.right.delete(i) : G.right.add(i); b.setAttribute('aria-pressed', String(G.right.has(i))); }; });
+  $$('.tbtn', root).forEach(b => { b.onclick = () => { b.blur(); const i = +b.dataset.t; G.right.has(i) ? G.right.delete(i) : G.right.add(i); b.setAttribute('aria-pressed', String(G.right.has(i))); }; });
   const last = G.qi >= G.qs.length - 1;
   const right = () => [...G.right].sort();
   if (G.mode === 'gold') setNext('Åbn kister', () => { const l = right(); l.length ? chest(l, 0) : after(); });

@@ -19,15 +19,16 @@ const BOT = '__bot__';
 const FAST = new URLSearchParams(location.search).get('hurtig') === '1';
 const WAVE1 = FAST ? 8000 : WAVE_FIRST_MS, WAVEN = FAST ? 12000 : WAVE_EVERY_MS;
 
-export async function startHost(quiz, o) {
+export async function startHost(quiz, o, onAgain) {
   const qs = prepQuestions(quiz, { shufA: o.shufA });
   H = {
     kind: 'host', quiz, mode: o.mode, qs, minutes: o.len, phase: 'opening', code: '',
     players: new Map(), banned: new Set(), feed: [], teamsN: MODES[o.mode].fixedTeams || (MODES[o.mode].liveTeams ? o.teams : 0),
-    goal: liveRaceGoal(o.len || 5), lastDraw: 0, dirty: true,
+    goal: liveRaceGoal(o.len || 5), lastDraw: 0, dirty: true, onAgain, opts: o, qstats: qs.map(() => ({ r: 0, w: 0 })),
   };
   enterGame(H, quiz.title);
   H.quit = quit; H.cleanup = cleanup;
+  document.getElementById('g-roster').hidden = false;
   setCount('Live · ' + MODES[o.mode].name);
   body('<div class="state"><h2>Opretter spil…</h2><p class="muted">Forbinder til netværket.</p></div>');
   setNext('Start', null, true);
@@ -164,7 +165,8 @@ function nextQ(p) {
 }
 function answer(p, c, ms) {
   const q = H.qs[p.curIdx], ci = correctIdx(q), dur = q.t * 1000, ok = ci.includes(c);
-  p.answeredCur = true; p.answered++;
+  p.answeredCur = true; p.answered++; p.lastAct = Date.now();
+  const qst = H.qstats[p.curIdx]; if (qst) { if (ok) qst.r++; else qst.w++; }
   if (ok) { p.correct++; p.streak++; p.best = Math.max(p.best, p.streak); } else p.streak = 0;
   const fx = {};
   if (H.mode === 'classic' || H.mode === 'team') { if (ok) { fx.pts = speedPoints(ms, dur) + streakBonus(p.streak); p.score += fx.pts; } }
@@ -285,7 +287,7 @@ function codeBox(small) {
   if (!H.qr) H.qr = qrSVG(joinUrl());
   const site = esc(location.host + location.pathname.replace(/index\.html$/, ''));
   if (small) return `<div class="codebox small"><span class="lbl">Deltag på ${site}</span><div class="code num">${H.code}</div></div>`;
-  return `<div class="codebox"><span class="lbl">Gå ind på</span><div class="site">${site}</div><span class="lbl">og skriv koden</span><div class="code num">${H.code}</div>${H.qr ? `<div class="qr" aria-label="QR-kode til spillet">${H.qr}</div><p class="muted small">…eller scan koden</p>` : ''}</div>`;
+  return `<div class="codebox"><span class="lbl">Gå ind på</span><div class="site">${site}</div><span class="lbl">tryk <b>Deltag i spil</b> og skriv koden</span><div class="code num">${H.code}</div>${H.qr ? `<div class="qr" aria-label="QR-kode til spillet">${H.qr}</div><p class="muted small">…eller scan koden</p>` : ''}</div>`;
 }
 
 function lobby() {
@@ -293,14 +295,16 @@ function lobby() {
   const root = body(`<div class="lobby">${codeBox()}
     <div><h2 class="lobby-h">${ps.length} ${ps.length === 1 ? 'elev' : 'elever'} er klar</h2>
     <p class="muted small">${MODES[H.mode].name} · ${H.minutes ? H.minutes + ' minutter' : 'ingen tidsgrænse'}${H.mode === 'race' ? ` · mål ${H.goal} felter` : ''}. ${H.teamsN ? 'Eleverne fordeles automatisk på hold. ' : ''}Tryk på et navn for at fjerne eleven.</p>
-    <div class="players">${ps.map(p => `<button class="pchip${p.online ? '' : ' off'}" data-k="${esc(p.sid)}" type="button">${avatarSVG(p.av, 30)}${p.team >= 0 ? `<i style="background:${TEAMS[p.team].c}"></i>` : ''}${esc(p.nm)}</button>`).join('') || '<span class="muted">Ingen endnu…</span>'}</div>
+    <div class="players">${ps.map(p => `<button class="pchip${p.online ? '' : ' off'}${H.seenChip && H.seenChip.has(p.sid) ? ' seen' : ''}" data-k="${esc(p.sid)}" type="button">${avatarSVG(p.av, 30)}${p.team >= 0 ? `<i style="background:${TEAMS[p.team].c}"></i>` : ''}<span>${esc(p.nm)}</span></button>`).join('') || '<span class="muted">Ingen endnu…</span>'}</div>
     <p class="muted small music-note">♪ ${esc(music.themeName(H.mode))}</p></div></div>`);
   $$('.pchip', root).forEach(b => {
     b.onclick = () => {
       if (b.classList.contains('confirm')) { kick(b.dataset.k); return; }
-      b.classList.add('confirm'); b.textContent = 'Fjern ' + H.players.get(b.dataset.k).nm + '?';
+      b.classList.add('confirm'); b.title = H.players.get(b.dataset.k).nm; b.lastChild.textContent = 'Fjern?'; H.confirmAt = Date.now();
+      setTimeout(() => { if (H && H.phase === 'lobby') { H.confirmAt = 0; lobby(); } }, 3500);
     };
   });
+  H.seenChip = new Set(ps.map(p => p.sid));
   if (H.teamsN) teamStrip(TEAMS.slice(0, H.teamsN).map((t, i) => ({ n: t.n, c: t.c, score: ps.filter(p => p.team === i).length })), 'elever');
   setStatus(active().length ? '<kbd>Mellemrum</kbd> starter' : 'Venter på elever');
   setNext('Start spillet', start, !active().length);
@@ -318,13 +322,13 @@ function start() {
   everyone().forEach(startPlayer);
   if (H.mode === 'duel') ensureDuels();
   if (H.mode === 'war') startWar();
-  setNext('Afslut spillet', end);
+  setNext('Afslut spillet', end, false, { quiet: true, confirm: 'Tryk igen for at afslutte', noKey: true });
   if (H.mode === 'warcoop') { startCoop(); return; }
   dirty(); draw();
 }
 function tick() {
   if (!H) return;
-  if (H.phase === 'lobby') { if (H.dirty && Date.now() - H.lastDraw > 300) { H.dirty = false; H.lastDraw = Date.now(); if (!document.querySelector('.pchip.confirm')) lobby(); else H.dirty = true; } return; }
+  if (H.phase === 'lobby') { if (H.dirty && Date.now() - H.lastDraw > 300) { H.dirty = false; H.lastDraw = Date.now(); if (!H.confirmAt || Date.now() - H.confirmAt > 3500) lobby(); else H.dirty = true; } return; }
   if (H.phase !== 'play') return;
   const now = Date.now();
   if (H.mode === 'tower') waveTick(now);
@@ -383,7 +387,7 @@ function end() {
   const tot = everyone().reduce((s, p) => s + p.answered, 0), right = everyone().reduce((s, p) => s + p.correct, 0);
   html += tot ? `<p class="muted center">Klassen svarede ${fmt(tot)} gange, og ${Math.round(right / tot * 100)} % var rigtige.</p>` : '';
   body(html); setStatus('');
-  setNext('Luk spillet', quit);
+  setNext('Luk spillet', quit, false, { noKey: true }); endExtras();
   broadcast();
 }
 function quit() {
@@ -452,7 +456,7 @@ function endWar() {
   const rows = sorted().map(p => ({ n: p.nm, av: p.av, v: p.score, dot: TEAMS[p.team] ? TEAMS[p.team].c : '', sub: `${p.kills || 0} fældet` }));
   H.warWinner = tie ? null : w;
   body(`<div class="center">${tie ? '<h2 class="big-msg">Uafgjort!</h2><p class="muted">Begge statuer står stadig, og holdene gjorde lige meget skade.</p>' : `<h2 class="big-msg" style="color:${TEAMS[w].c}">Hold ${TEAMS[w].n} vinder!</h2><p class="muted">Hold ${TEAMS[w].n} ${how}</p>`}</div>${podiumHTML(rows, { unit: 'skade' })}${lbHTML(rows.slice(3, 12), { unit: 'skade' })}`);
-  setStatus(''); setNext('Luk spillet', quit);
+  setStatus(''); setNext('Luk spillet', quit, false, { noKey: true }); endExtras();
   broadcast();
 }
 
@@ -579,6 +583,28 @@ function endCoop() {
   const rows = sorted().map(p => ({ n: p.nm, av: p.av, v: p.score, sub: `${p.correct}/${p.answered} rigtige` }));
   const how = b.winner === 0 ? 'Computerens statue faldt!' : b.winner === 1 ? 'Klassens statue faldt.' : won ? 'Klassen har mest statue tilbage.' : 'Computeren har mest statue tilbage.';
   body(`<div class="center"><h2 class="big-msg" style="color:${won ? 'var(--good)' : 'var(--bad)'}">${won ? 'Klassen vandt!' : 'Computeren vandt'}</h2><p class="muted">${how} I spillede ${H.coop.round} ${H.coop.round === 1 ? 'runde' : 'runder'}.</p></div>${podiumHTML(rows, { unit: 'skade' })}${lbHTML(rows.slice(3, 12), { unit: 'skade' })}`);
-  setStatus(''); setNext('Luk spillet', quit);
+  setStatus(''); setNext('Luk spillet', quit, false, { noKey: true }); endExtras();
   broadcast();
+}
+
+/* ---------- elevliste (under spillet) og afslutning ---------- */
+function ago(t) { if (!t) return 'ikke svaret endnu'; const s = Math.round((Date.now() - t) / 1000); return s < 60 ? `svarede for ${s} s siden` : `svarede for ${Math.floor(s / 60)} min siden`; }
+export function rosterHTML() {
+  if (!H) return '';
+  const ps = everyone().sort((a, b) => (a.online === b.online ? a.nm.localeCompare(b.nm, 'da') : a.online ? -1 : 1));
+  if (!ps.length) return '<p class="muted">Ingen elever endnu.</p>';
+  return ps.map(p => {
+    const idle = p.online && H.phase === 'play' && p.lastAct && Date.now() - p.lastAct > 90000;
+    return `<div class="ros-row${p.online ? '' : ' off'}">${avatarSVG(p.av, 34)}<div class="ros-main"><b>${esc(p.nm)}</b><small>${p.online ? (idle ? 'har ikke svaret længe · ' : '') + `${p.correct}/${p.answered} rigtige · ${ago(p.lastAct)}` : 'har forladt spillet'}</small></div><button class="btn ghost danger" type="button" data-kick="${esc(p.sid)}">Fjern</button></div>`;
+  }).join('');
+}
+export function kickFromRoster(sid) { if (H && H.players.has(sid)) kick(sid); }
+function endExtras() {
+  const g = document.getElementById('g-body'); if (!g || !H) return;
+  const st = H.qstats.map((x, i) => ({ i, n: x.r + x.w, pct: x.r + x.w ? x.r / (x.r + x.w) : 1 })).filter(x => x.n >= 2).sort((a, b) => a.pct - b.pct).slice(0, 3);
+  const again = '';
+  g.insertAdjacentHTML('beforeend', `${st.length && st[0].pct < 0.8 ? `<div class="hard-qs"><h3>Det drillede mest</h3>${st.filter(x => x.pct < 0.8).map(x => `<div class="hq"><span>${esc(H.qs[x.i].q)}</span><b>${Math.round(x.pct * 100)} % rigtige</b><small>Rigtigt svar: ${H.qs[x.i].opts.filter(o => o.ok).map(o => esc(o.t)).join(' / ')}</small></div>`).join('')}</div>` : ''}<div class="row end end-actions">${again}</div>`);
+  if (H.onAgain) document.getElementById('g-next').insertAdjacentHTML('beforebegin', '<button class="btn big" id="end-again" type="button">Spil igen</button>');
+  const b = document.getElementById('end-again');
+  if (b) { const quiz = H.quiz, cb = H.onAgain; b.onclick = () => { quit(); setTimeout(() => cb(quiz), 450); }; }
 }

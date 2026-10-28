@@ -1,11 +1,18 @@
 // Quiz-editor med billeder.
-import { $, $$, esc, clone, newId, LET, toast } from './util.js';
+import { $, $$, esc, clone, newId, LET, toast, lsGet, lsSet, confirmClick } from './util.js';
 import { TIMES } from './csv.js';
 import { openImagePicker, autoSearch, keywords, localize, localizeQuiz } from './images.js';
 import { show } from './stage.js';
 import { shapeSVG } from './ui.js';
 
-let ED = null, onSave = null, onLeave = null;
+let ED = null, onSave = null, onLeave = null, SNAP = '', IS_NEW = false, draftT = 0;
+const DRAFT = 'kqa.draft';
+function readFields() { if (!ED) return; ED.title = $('#ed-title').value; ED.subject = $('#ed-subject').value; ED.grade = $('#ed-grade').value; }
+const isDirty = () => { if (!ED) return false; readFields(); return JSON.stringify(ED) !== SNAP; };
+function saveDraft() { clearTimeout(draftT); draftT = setTimeout(() => { if (ED && isDirty()) lsSet(DRAFT, { q: ED, isNew: IS_NEW, at: Date.now() }); }, 400); }
+export const getDraft = () => lsGet(DRAFT, null);
+export const clearDraft = () => { try { localStorage.removeItem(DRAFT); } catch (e) { /* */ } };
+function leave() { clearDraft(); ED = null; onLeave(); }
 const blankQ = () => ({ q: '', a: ['', '', '', ''], c: [0], t: 20 });
 
 export function initEditor(save, leave) {
@@ -13,25 +20,29 @@ export function initEditor(save, leave) {
   $('#ed-list').addEventListener('input', onInput);
   $('#ed-list').addEventListener('change', onInput);
   $('#ed-list').addEventListener('click', onClick);
+  ['#ed-title', '#ed-subject', '#ed-grade'].forEach(id => $(id).addEventListener('input', () => { $(id).classList.remove('bad-field'); saveDraft(); }));
+  $('#ed-list').addEventListener('input', saveDraft); $('#ed-list').addEventListener('change', saveDraft);
   $('#ed-add').onclick = () => {
     const last = ED.questions[ED.questions.length - 1], q = blankQ(); if (last) q.t = last.t;
     ED.questions.push(q); render();
     const i = ED.questions.length - 1;
     setTimeout(() => { const t = $('#q' + i + '-q'); if (t) { t.focus(); t.scrollIntoView({ block: 'center' }); } }, 30);
   };
-  $('#ed-cancel').onclick = $('#ed-cancel2').onclick = () => { ED = null; onLeave(); };
+  [$('#ed-cancel'), $('#ed-cancel2')].forEach(b => { b.onclick = () => { if (isDirty()) confirmClick(b, 'Kassér ændringer?', leave); else leave(); }; });
   $('#ed-save').onclick = save_;
   $('#ed-autoimg').onclick = autoImages;
 }
 
 export function openEditor(q, isNew) {
-  ED = clone(q);
+  ED = clone(q); IS_NEW = !!isNew;
   if (ED.builtin) { ED.id = newId(); delete ED.builtin; ED.title = ED.title + ' (kopi)'; }
   ED.questions.forEach(x => { while (x.a.length < 4) x.a.push(''); });
   $('#ed-h').textContent = isNew ? 'Ny quiz' : 'Rediger quiz';
   $('#ed-title').value = ED.title || ''; $('#ed-subject').value = ED.subject || ''; $('#ed-grade').value = ED.grade || '';
-  $('#ed-errs').hidden = true;
+  $('#ed-errs').hidden = true; $('#ed-title').classList.remove('bad-field');
   render(); show('v-edit');
+  readFields(); SNAP = isNew === 'draft' ? '' : JSON.stringify(ED);
+  if (isNew && !ED.title) setTimeout(() => $('#ed-title').focus(), 50);
 }
 
 function render(bad = new Set()) {
@@ -81,6 +92,7 @@ async function onClick(e) {
     if (r === null) delete q.img; else q.img = r;
     render();
   }
+  saveDraft();
 }
 
 async function autoImages() {
@@ -95,20 +107,26 @@ async function autoImages() {
     try {
       const { results } = await autoSearch(todo[k].q.q, $('#ed-subject').value);
       const hit = results.find(r => !used.has(r.src) && r.w >= r.h * 0.9) || results.find(r => !used.has(r.src));
-      if (hit && ED) { todo[k].q.img = await localize({ src: hit.src, credit: hit.credit, lic: hit.lic, page: hit.page }); used.add(hit.src); found++; }
+      if (hit && ED) {
+        const im = await localize({ src: hit.src, credit: hit.credit, lic: hit.lic, page: hit.page });
+        if (/^data:/.test(im.src) || await canLoad(im.src)) { todo[k].q.img = im; used.add(hit.src); found++; }
+      }
     } catch (e) { /* spring over */ }
   }
   btn.disabled = false; btn.textContent = 'Find billeder automatisk';
   if (!ED) return;
   render();
-  toast(found ? `${found} billeder fundet. Tjek at de passer, og at de ikke afslører svaret.` : 'Fandt ingen billeder. Prøv at søge selv på et enkelt spørgsmål.');
+  saveDraft();
+  toast(found ? `${found} ${found === 1 ? 'billede' : 'billeder'} fundet. Tjek, at de passer og ikke afslører svaret.` : 'Fandt ingen billeder. Prøv at søge selv på et enkelt spørgsmål.');
 }
 
 async function save_() {
-  ED.title = $('#ed-title').value.trim(); ED.subject = $('#ed-subject').value.trim(); ED.grade = $('#ed-grade').value.trim();
+  readFields();
+  const q = clone(ED);
+  q.title = q.title.trim(); q.subject = q.subject.trim(); q.grade = q.grade.trim();
   const errs = [], bad = new Set();
-  if (!ED.title) errs.push('Giv quizzen en titel.');
-  ED.questions.forEach((x, i) => {
+  if (!q.title) { errs.push('Giv quizzen en titel.'); $('#ed-title').classList.add('bad-field'); }
+  q.questions.forEach((x, i) => {
     x.q = x.q.trim(); x.a = x.a.map(s => s.trim());
     const p = [];
     if (!x.q) p.push('mangler tekst');
@@ -118,15 +136,21 @@ async function save_() {
     x.c = x.c.filter(j => x.a[j]);
   });
   const box = $('#ed-errs');
-  if (errs.length) { box.innerHTML = '<b>Ret dette, før du gemmer:</b><ul>' + errs.map(m => '<li>' + esc(m) + '</li>').join('') + '</ul>'; box.hidden = false; render(bad); window.scrollTo(0, 0); return; }
+  if (errs.length) {
+    box.innerHTML = '<b>Ret dette, før du gemmer:</b><ul>' + errs.map(m => '<li>' + esc(m) + '</li>').join('') + '</ul>'; box.hidden = false; render(bad);
+    const first = !q.title ? $('#ed-title') : document.querySelector('.qed.bad');
+    if (first) { first.scrollIntoView({ block: 'center' }); if (first.focus) first.focus(); }
+    return;
+  }
   box.hidden = true;
-  const q = clone(ED);
   if (q.questions.some(x => x.img && /^https?:/.test(x.img.src))) {
     const b = $('#ed-save'); b.disabled = true;
     await localizeQuiz(q, n => { b.textContent = `Gemmer billeder… ${n}`; });
     b.disabled = false; b.textContent = 'Gem quiz';
   }
-  ED = null;
+  ED = null; clearDraft();
   await onSave(q);
 }
+function canLoad(src) { return new Promise(r => { const i = new Image(); i.onload = () => r(true); i.onerror = () => r(false); i.src = src; setTimeout(() => r(false), 8000); }); }
 export const editorOpen = () => !!ED;
+export const editorDirty = () => isDirty();

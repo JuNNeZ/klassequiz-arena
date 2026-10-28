@@ -31,6 +31,15 @@
 <main class="wrap">
   <!-- BIBLIOTEK -->
   <section id="v-lib" hidden>
+    <div class="join-strip">
+      <label for="lib-code"><b>Er du elev?</b> Skriv koden fra tavlen</label>
+      <input type="text" id="lib-code" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="0000" aria-label="Spilkode">
+      <button class="btn primary" id="lib-join" type="button">Deltag</button>
+    </div>
+    <div class="draft-bar" id="draft-bar" hidden>
+      <span>Du har en kladde: <b id="draft-title"></b></span>
+      <span class="row"><button class="btn primary" id="draft-go" type="button">Fortsæt redigering</button><button class="btn ghost" id="draft-drop" type="button">Kassér</button></span>
+    </div>
     <div class="lib-head">
       <div>
         <h1>Quizzer</h1>
@@ -58,8 +67,8 @@
     </div>
     <div class="ed-head">
       <div class="field"><label for="ed-title">Titel</label><input type="text" id="ed-title" maxlength="80" placeholder="Fx Brøker"></div>
-      <div class="field"><label for="ed-subject">Fag</label><input type="text" id="ed-subject" maxlength="30" placeholder="Matematik"></div>
-      <div class="field"><label for="ed-grade">Klassetrin</label><input type="text" id="ed-grade" maxlength="30" placeholder="5. klasse"></div>
+      <div class="field"><label for="ed-subject">Fag</label><input type="text" id="ed-subject" maxlength="30" placeholder="Fx matematik"></div>
+      <div class="field"><label for="ed-grade">Klassetrin</label><input type="text" id="ed-grade" maxlength="30" placeholder="Fx 5. klasse"></div>
     </div>
     <div class="row ed-tools">
       <button class="btn" id="ed-autoimg" type="button">Find billeder automatisk</button>
@@ -81,6 +90,7 @@
       <div class="prog"><b id="g-title"></b><span class="muted num" id="g-count"></span></div>
       <div class="teamstrip" id="g-teams"></div>
       <div class="timer" id="g-timer" hidden><span id="g-time">20</span></div>
+      <button class="btn ghost" id="g-roster" type="button" hidden>Elever</button>
       <button class="btn ghost" id="g-music" type="button" aria-pressed="true">Musik: til</button>
       <button class="btn ghost" id="g-full" type="button" title="Fuld skærm">Fuld skærm</button>
       <button class="btn ghost" id="g-quit" type="button">Afslut</button>
@@ -121,17 +131,14 @@
 <div class="modal" id="setup" hidden role="dialog" aria-modal="true" aria-labelledby="setup-h">
   <div class="sheet setup-sheet">
     <h2 id="setup-h">Start quiz</h2>
+    <div class="where-seg" role="radiogroup" aria-label="Hvor spiller I?">
+      <label><input type="radio" name="where" value="live" id="w-live" checked><span><b>Live</b><small>Eleverne spiller på egne enheder. Intet login.</small></span></label>
+      <label><input type="radio" name="where" value="board" id="w-board"><span><b>Tavle</b><small>Én skærm. Klassen svarer højt eller på hold.</small></span></label>
+    </div>
     <fieldset>
       <legend>Vælg spil</legend>
       <div class="modes" id="modes"></div>
       <p class="mode-desc" id="mode-desc"></p>
-    </fieldset>
-    <fieldset id="where-wrap">
-      <legend>Hvor spiller I?</legend>
-      <div class="choice two">
-        <label><input type="radio" name="where" value="live" id="w-live" checked><span><b>Live</b><small>Eleverne spiller på egne enheder med en kode. Intet login.</small></span></label>
-        <label><input type="radio" name="where" value="board" id="w-board"><span><b>Tavle</b><small>Én skærm. Klassen svarer højt eller på hold.</small></span></label>
-      </div>
     </fieldset>
     <fieldset>
       <legend>Indstillinger</legend>
@@ -216,6 +223,11 @@
   </div>
 </div>
 
+<aside class="drawer" id="roster" hidden aria-labelledby="roster-h">
+  <div class="drawer-head"><h2 id="roster-h">Elever</h2><button class="btn ghost" id="roster-close" type="button">Luk</button></div>
+  <p class="muted small mt0">Fjern en elev med et upassende navn. Eleven kan ikke komme ind igen i dette spil.</p>
+  <div id="roster-list"></div>
+</aside>
 <div id="toast" role="status" aria-live="polite"></div>
 <noscript><p class="wrap">Klassequiz Arena kræver JavaScript.</p></noscript>
 </body>

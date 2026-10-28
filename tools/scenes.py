@@ -56,8 +56,17 @@ S['self'] = svg(books + '<rect x="0" y="168" width="1200" height="12" fill="#6b4
 banners = ''.join(f'<path d="M{x} 150 V{90 - (x % 3) * 8}" stroke="#3a2a1a" stroke-width="4"/><path d="M{x} {90 - (x % 3) * 8} l{30 if x < 600 else -30} 8 l{-30 if x < 600 else 30} 8 z" fill="{"#e5574c" if x < 600 else "#3a8fdc"}"/>' for x in (80, 190, 300, 900, 1010, 1120))
 spears = ''.join(f'<path d="M{x} 150 L{x + (10 if x < 600 else -10)} 96" stroke="#2a2018" stroke-width="3"/>' for x in range(30, 1200, 23) if not 470 < x < 730)
 S['war'] = svg('<path d="M0 150 Q200 112 420 140 T800 132 T1200 140 V180 H0 Z" fill="#3d5a2a"/>' + spears + banners + '<rect x="0" y="150" width="1200" height="30" fill="#2f4620"/>')
-S['warsolo'] = S['war']
-S['warcoop'] = S['war']
+# Felttoget: én hær på vej op ad bakken mod en fjern borg
+march = ''.join(f'<path d="M{x} 150 L{x + 8} 100" stroke="#2a2018" stroke-width="3"/><circle cx="{x}" cy="{136 - (x % 2) * 3}" r="6" fill="#1d1a17"/><rect x="{x - 5}" y="{131 - (x % 2) * 3}" width="10" height="3" fill="#3a8fdc"/>' for x in range(60, 640, 36))
+S['warsolo'] = svg('<path d="M0 160 Q300 150 600 140 T1200 90 V180 H0 Z" fill="#3d5a2a"/>' + march +
+    '<rect x="980" y="40" width="120" height="60" fill="#2d2838"/>' + ''.join(f'<rect x="{x}" y="28" width="18" height="14" fill="#2d2838"/>' for x in (980, 1014, 1048, 1082)) +
+    '<path d="M1040 28 V0" stroke="#2a2018" stroke-width="3"/><path d="M1040 0 L1070 8 L1040 16 Z" fill="#8d62cc"/><rect x="0" y="160" width="1200" height="20" fill="#2f4620"/>')
+# Fæstningen: klassens mur med mange blå bannere mod lilla bølge
+wall = ''.join(f'<rect x="{x}" y="92" width="26" height="20" fill="#5a5560"/>' for x in range(0, 520, 44))
+purple = ''.join(f'<path d="M{x} 150 L{x - 8} 104" stroke="#2a2018" stroke-width="3"/><path d="M{x - 8} 104 l-22 6 l22 6 z" fill="#8d62cc"/>' for x in range(700, 1200, 60))
+S['warcoop'] = svg('<rect x="0" y="110" width="520" height="70" fill="#5a5560"/>' + wall +
+    ''.join(f'<path d="M{x} 92 V50" stroke="#2a2018" stroke-width="3"/><path d="M{x} 50 l26 7 l-26 7 z" fill="#3a8fdc"/>' for x in (60, 190, 320, 450)) +
+    '<path d="M520 160 Q800 130 1200 150 V180 H520 Z" fill="#3d5a2a"/>' + purple + '<rect x="0" y="165" width="1200" height="15" fill="#2f4620"/>')
 
 print('/* Genereret af tools/scenes.py: silhuetter i bunden af hver spilverden */')
 for k, v in S.items():

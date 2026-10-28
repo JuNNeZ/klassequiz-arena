@@ -4,10 +4,10 @@ import { csvToQuiz, quizToBlooketCSV, quizToJSON, jsonToQuizzes, encodeShare, de
 import { MODES, prepQuestions, selfQuestions } from './modes.js';
 import { BUILTIN } from './data.js';
 import { initImagePicker, localizeQuiz } from './images.js';
-import { initEditor, openEditor, editorOpen } from './editor.js';
+import { initEditor, openEditor, editorOpen, editorDirty, getDraft, clearDraft } from './editor.js';
 import { stage, show, initStage } from './stage.js';
 import { startBoard } from './board.js';
-import { startHost } from './host.js';
+import { startHost, rosterHTML, kickFromRoster } from './host.js';
 import { initJoin, P } from './player.js';
 import { startSelf, SS, stopSelf } from './self.js';
 import { p2pAvailable } from './net.js';
@@ -18,12 +18,14 @@ const find = id => all().find(q => q.id === id);
 
 /* ---------- navigation ---------- */
 function route() {
-  if (stage.G || P) return;
+  if (stage.G) { if (location.hash !== '#spil') { try { history.pushState({ game: 1 }, '', '#spil'); } catch (e) { /* */ } toast('Spillet kører stadig. Brug Afslut for at stoppe det.'); } return; }
+  if (P) return;
   delete document.body.dataset.world;
   const h = location.hash;
   if (h.startsWith('#ov=')) { openShared(h.slice(4)); return; }
   if (h === '#deltag') { stopSelf(); show('v-join'); setTimeout(() => $('#j-code').focus(), 50); return; }
   if (editorOpen() && h === '#rediger') return;
+  if (editorOpen() && editorDirty()) toast('Din kladde er gemt. Du kan fortsætte fra Quizzer.');
   stopSelf(); renderLib(); show('v-lib');
 }
 const go = h => { if (location.hash === h) route(); else location.hash = h; };
@@ -33,6 +35,9 @@ stage.onExit = () => go('#quizzer');
 const COVERS = ['classic', 'gold', 'fish', 'tower', 'race', 'duel', 'self', 'team'];
 const coverWorld = q => COVERS[[...(q.subject || q.title || '')].reduce((h, c) => h + c.charCodeAt(0), 0) % COVERS.length];
 function renderLib() {
+  const d = getDraft();
+  $('#draft-bar').hidden = !d;
+  if (d) $('#draft-title').textContent = (d.q && d.q.title && d.q.title.trim()) || 'Ny quiz uden titel';
   $('#lib-grid').innerHTML = all().map(q => {
     const imgs = q.questions.filter(x => x.img).length;
     const cover = q.questions.find(x => x.img);
@@ -43,10 +48,10 @@ function renderLib() {
       <p class="muted small">${[q.grade, q.questions.length + ' spørgsmål', imgs ? imgs + ' med billede' : '', q.builtin ? 'eksempel' : ''].filter(Boolean).map(esc).join(', ')}</p>
       <div class="card-actions">
         <button class="btn primary" data-act="play" type="button">Spil</button>
-        <button class="btn" data-act="self" type="button">Øv selv</button>
+        <button class="btn" data-act="share" type="button">Del øvelink</button>
         <details class="more"><summary class="btn ghost" aria-label="Flere handlinger">Mere</summary><div class="menu">
           <button data-act="edit" type="button">${q.builtin ? 'Kopiér og ret' : 'Rediger'}</button>
-          <button data-act="share" type="button">Del øvelink</button>
+          <button data-act="self" type="button">Prøv quizzen selv</button>
           <button data-act="export" type="button">Eksportér</button>
           ${q.builtin ? '' : '<button class="danger" data-act="del" type="button">Slet</button>'}
         </div></details>
@@ -151,11 +156,13 @@ function opt() {
   return { where: $('input[name=where]:checked').value, mode: $('input[name=mode]:checked').value, teams: +$('#o-teams').value, timer: $('#o-timer').checked, len: +$('#o-len').value, shufQ: $('#o-shufq').checked, shufA: $('#o-shufa').checked };
 }
 function syncSetup() {
-  let o = opt(); const m = MODES[o.mode];
-  // Spil, der kun findes live, skifter automatisk til Live
-  $('#w-board').disabled = !m.board;
-  if (!m.board && o.where === 'board') { $('#w-live').checked = true; o = opt(); }
-  $('#mode-desc').innerHTML = `<b>${m.name}:</b> ${m.desc}${m.board ? '' : ' <em>Spilles live på elevernes egne enheder.</em>'}`;
+  let o = opt();
+  // Vis kun de spil, der kan spilles det valgte sted
+  $$('#modes label').forEach(l => { const md = MODES[l.querySelector('input').value]; l.hidden = o.where === 'board' && !md.board; });
+  if (o.where === 'board' && !MODES[o.mode].board) { $('#m-classic').checked = true; o = opt(); }
+  const m = MODES[o.mode];
+  const desc = o.where === 'board' ? (m.boardDesc || m.desc) : m.desc;
+  $('#mode-desc').innerHTML = `<b>${m.name}:</b> ${desc}`;
   $('#teams-wrap').hidden = !((o.where === 'board' && m.boardTeams) || (o.where === 'live' && m.liveTeams && !m.fixedTeams));
   $('#timer-wrap').hidden = o.where !== 'board';
   $('#len-wrap').hidden = o.where !== 'live';
@@ -163,7 +170,6 @@ function syncSetup() {
   const note = $('#setup-note'), err = $('#setup-err'), go = $('#setup-go');
   note.hidden = true; err.hidden = true; go.disabled = false;
   if (o.where === 'live' && !p2pAvailable()) { err.textContent = 'Live kunne ikke indlæses. Genindlæs siden.'; err.hidden = false; go.disabled = true; }
-  else if (o.where === 'board' && m.boardTeams) { note.textContent = 'På tavlen spiller klassen på hold.'; note.hidden = false; }
   go.textContent = o.where === 'live' ? 'Start live-spil' : 'Start på tavlen';
 }
 function initSetup() {
@@ -173,7 +179,7 @@ function initSetup() {
   $('#setup-go').onclick = () => {
     const o = opt(); $('#setup').hidden = true;
     lsSet('kqa.setup', { mode: o.mode, where: o.where });
-    if (o.where === 'board') startBoard(SETUP, o, openSetup); else startHost(SETUP, o);
+    if (o.where === 'board') startBoard(SETUP, o, openSetup); else startHost(SETUP, o, openSetup);
   };
   $('#setup').addEventListener('keydown', e => { if (e.key === 'Escape') $('#setup').hidden = true; });
 }
@@ -185,6 +191,17 @@ async function init() {
   initStage(); initImagePicker(); initSetup(); initJoin();
   initEditor(async q => { await saveQuiz(q); go('#quizzer'); renderLib(); }, () => go('#quizzer'));
   $('#lib-grid').addEventListener('click', onLibClick);
+  $('#draft-go').onclick = () => { const d = getDraft(); if (d) { openEditor(d.q, d.isNew ? true : 'draft'); history.replaceState(null, '', '#rediger'); } };
+  $('#draft-drop').onclick = () => confirmClick($('#draft-drop'), 'Tryk igen for at kassere', () => { clearDraft(); renderLib(); });
+  const libJoin = () => { const c = $('#lib-code').value.replace(/\D/g, '').slice(0, 4); if (c.length !== 4) { $('#lib-code').focus(); return; } $('#j-code').value = c; go('#deltag'); setTimeout(() => $('#j-name').focus(), 80); };
+  $('#lib-code').addEventListener('input', e => { e.target.value = e.target.value.replace(/\D/g, '').slice(0, 4); if (e.target.value.length === 4) libJoin(); });
+  $('#lib-join').onclick = libJoin;
+  // Elevliste under live-spil
+  const renderRoster = () => { if (!$('#roster').hidden) $('#roster-list').innerHTML = rosterHTML(); const n = (rosterHTML().match(/ros-row/g) || []).length; $('#g-roster').textContent = `Elever (${n})`; };
+  $('#g-roster').onclick = () => { $('#roster').hidden = !$('#roster').hidden; renderRoster(); };
+  $('#roster-close').onclick = () => { $('#roster').hidden = true; };
+  $('#roster-list').addEventListener('click', e => { const b = e.target.closest('[data-kick]'); if (b) confirmClick(b, 'Tryk igen', () => { kickFromRoster(b.dataset.kick); renderRoster(); }); });
+  setInterval(() => { if (!$('#g-roster').hidden) renderRoster(); }, 2000);
   document.addEventListener('click', e => { $$('details.more[open]').forEach(d => { if (!d.contains(e.target)) d.open = false; }); });
   $('#b-new').onclick = () => { openEditor({ id: 'n' + Date.now().toString(36), title: '', subject: '', grade: '', questions: [{ q: '', a: ['', '', '', ''], c: [0], t: 20 }] }, true); history.replaceState(null, '', '#rediger'); };
   $('#b-import').onclick = () => openIO('import');

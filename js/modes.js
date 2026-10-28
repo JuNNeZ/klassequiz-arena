@@ -1,9 +1,9 @@
 // Spillogik uden DOM. Bruges af både tavle, værtsskærm og elevskærm.
 
 export const MODES = {
-  classic: { name: 'Klassisk',    desc: 'Rigtige svar giver point. Hurtige svar og stime giver bonus.', live: true, board: true, unit: 'point' },
+  classic: { name: 'Klassisk',    desc: 'Rigtige svar giver point. Hurtige svar og stime giver bonus.', boardDesc: 'I gennemgår spørgsmålene sammen på tavlen. Godt til opsamling og fælles snak.', live: true, board: true, unit: 'point' },
   gold:    { name: 'Guldjagt',    desc: 'Rigtigt svar giver en kiste: guld, dobbelt op, eller stjæl fra andre.', live: true, board: true, boardTeams: true, unit: 'guld' },
-  team:    { name: 'Holdkamp',    desc: 'Klassen deles i hold, der samler point sammen.', live: true, board: true, boardTeams: true, liveTeams: true, unit: 'point' },
+  team:    { boardDesc: 'Klassen deles i hold. Du markerer, hvilke hold der svarede rigtigt, og holdene får point.', name: 'Holdkamp',    desc: 'Klassen deles i hold, der samler point sammen.', live: true, board: true, boardTeams: true, liveTeams: true, unit: 'point' },
   race:    { name: 'Racerløb',    desc: 'Rigtige svar sender dig frem. Først i mål vinder.', live: true, board: true, boardTeams: true, unit: 'felter' },
   fish:    { name: 'Fiskeri',     desc: 'Rigtigt svar = kast snøren. Stime giver held. Tungeste fangst vinder.', live: true, board: true, boardTeams: true, unit: 'kg' },
   tower:   { name: 'Tårnforsvar', desc: 'Tjen mønter, byg tårne og stop monsterbølgerne.', live: true, board: false, unit: 'point' },
