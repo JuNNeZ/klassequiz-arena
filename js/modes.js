@@ -38,9 +38,9 @@ export function rollChest(me, others, rand = R) {
   const gain = n => () => ({ kind: 'gain', txt: `+${n} guld`, d: n });
   const opts = [
     [14, gain(10)], [14, gain(20)], [12, gain(30)], [10, gain(40)], [8, gain(50)], [3, gain(100)],
-    [6, () => ({ kind: 'double', txt: 'Dobbelt op!', d: Math.max(me.gold, 20) })],
-    [7, () => ({ kind: 'gain', txt: '+25 % guld', d: Math.max(Math.round(me.gold * 0.25), 10) })],
-    [7, () => ({ kind: 'lose', txt: 'Øv! Du mistede 25 %', d: -Math.round(me.gold * 0.25) })],
+    [6, () => { const n = Math.max(me.gold, 20); return { kind: 'double', txt: `Dobbelt op! +${n} guld`, d: n }; }],
+    [7, () => { const n = Math.max(Math.round(me.gold * 0.25), 10); return { kind: 'gain', txt: `Bonus! +${n} guld`, d: n }; }],
+    [7, () => { const n = Math.round(me.gold * 0.25); return { kind: 'lose', txt: n ? `Øv! Du mistede ${n} guld` : 'Øv! Kisten var tom', d: -n }; }],
     [5, () => ({ kind: 'empty', txt: 'Kisten var tom', d: 0 })],
   ];
   if (rich.length) {

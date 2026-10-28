@@ -30,7 +30,7 @@ export function tilesHTML(opts, st = {}) {
 // Spørgsmål + evt. billede. size: 'stage' (tavle) eller 'phone'
 export function questionHTML(text, { img, multi, size = 'stage', pop = false } = {}) {
   const len = String(text || '').length, fit = len > 170 ? ' xlong' : len > 90 ? ' long' : '';
-  const head = `${multi ? '<span class="multi">Flere svar er rigtige</span>' : ''}<h2 class="qtext${fit}${pop ? ' pop' : ''}">${esc(text)}</h2>`;
+  const head = `${multi ? '<span class="multi">Der er flere rigtige svar. Vælg ét.</span>' : ''}<h2 class="qtext${fit}${pop ? ' pop' : ''}">${esc(text)}</h2>`;
   if (!img || !img.src) return `<div class="qhead">${head}</div>`;
   return `<div class="qhead has-img ${size}"><div class="qtxt">${head}</div>${imgHTML(img)}</div>`;
 }

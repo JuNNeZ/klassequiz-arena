@@ -31,10 +31,12 @@ function answer(i) {
   $$('.tile', s.root).forEach(b => {
     const j = +b.dataset.i; b.disabled = true;
     b.classList.add(q.c.includes(j) ? 'right' : 'dim');
-    if (j === i && !ok) { b.classList.remove('dim'); b.classList.add('picked'); }
+    if (j === i && !ok) { b.classList.remove('dim'); b.classList.add('picked', 'wrong'); }
+    if (q.c.includes(j)) b.insertAdjacentHTML('beforeend', '<span class="tile-ok">✓ Rigtigt</span>');
+    else if (j === i) b.insertAdjacentHTML('beforeend', '<span class="tile-ok">✕ Dit svar</span>');
   });
   const fb = $('#fb', s.root); fb.className = 'feedback ' + (ok ? 'good' : 'bad');
-  fb.textContent = ok ? 'Rigtigt!' : 'Ikke helt. Det rigtige svar er markeret.';
+  fb.textContent = ok ? 'Rigtigt!' : 'Ikke helt. Det rigtige svar er markeret med ✓.';
   fb.insertAdjacentHTML('afterend', '<button class="btn primary big" id="self-next" type="button">Næste</button>');
   const nb = $('#self-next', s.root); nb.focus(); nb.onclick = () => { s.i++; render(); };
   report();
@@ -42,7 +44,7 @@ function answer(i) {
 function end() {
   const s = SS; SFX.end();
   const pct = Math.round(s.right / s.qs.length * 100);
-  s.root.innerHTML = `<div class="state ${pct >= 80 ? 'good' : ''}"><h2>${s.right} af ${s.qs.length} rigtige</h2><p class="muted">${pct >= 80 ? 'Flot klaret!' : pct >= 50 ? 'Godt gået. Øv dem, der drillede.' : 'Øv dig lidt mere, så sidder det.'}</p></div>
+  s.root.innerHTML = `<div class="state ${pct >= 80 ? 'good' : ''}"><h2>${s.right} ud af ${s.qs.length} rigtige</h2><p class="muted">${pct >= 80 ? 'Flot klaret!' : pct >= 50 ? 'Godt gået. Øv dem, der drillede.' : 'Øv dig lidt mere, så sidder det.'}</p></div>
     <div class="row center-row">${s.wrong.length ? `<button class="btn primary big" id="ss-wrong" type="button">Øv de ${s.wrong.length} forkerte</button>` : ''}<button class="btn big" id="ss-again" type="button">Start forfra</button></div>`;
   report();
   const w = $('#ss-wrong', s.root);

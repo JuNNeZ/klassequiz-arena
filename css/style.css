@@ -539,3 +539,23 @@ body.playing .wrap{max-width:min(1700px,100%)}
 
 .pchip.seen{animation:none}
 .stage-foot #end-again{margin-left:auto}
+
+/* elevvenlighed */
+.answer-fix{display:flex;flex-direction:column;gap:6px;margin-top:4px;font-size:1.15rem}
+.answer-fix p{margin:0}
+.ans-chip{display:inline-flex;align-items:center;gap:6px;background:var(--frame);border-radius:10px;padding:3px 10px;font-weight:700;color:var(--chalk)}
+.ans-chip .shape{width:16px;height:16px}
+.ans-chip.ok{background:var(--good);color:#0b2414;font-size:1.2em}
+.note.timeup{text-align:center;font-weight:700}
+.tile.wrong{outline-color:var(--bad)!important}
+.shop-hint{margin:0;color:var(--chalk);background:var(--frame);border-radius:12px;padding:8px 12px;font-size:.95rem;text-align:center}
+.unit-b span{white-space:nowrap}
+.unit-b small{color:var(--dust);font-size:.7rem;line-height:1.15;white-space:normal}
+.unit-b b{font-size:.8rem}
+.wm-lbl{font-size:.8rem;color:var(--dust);font-weight:700}
+.shop-b small{display:block!important}
+.tw-letter{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:5px;background:var(--chalk);color:var(--frame);font-size:.75rem}
+.me-bar{border-radius:20px}
+.me-bar > span:last-child{margin-left:auto;text-align:right}
+#j-code.bad-field{border-color:var(--bad)}
+.unit-b b{white-space:normal;overflow:visible;text-overflow:clip;hyphens:auto;font-size:.74rem}

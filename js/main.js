@@ -18,6 +18,7 @@ const find = id => all().find(q => q.id === id);
 
 /* ---------- navigation ---------- */
 function route() {
+  if (!location.hash.startsWith('#ov=') && !P) document.body.classList.remove('in-game');
   if (stage.G) { if (location.hash !== '#spil') { try { history.pushState({ game: 1 }, '', '#spil'); } catch (e) { /* */ } toast('Spillet kører stadig. Brug Afslut for at stoppe det.'); } return; }
   if (P) return;
   delete document.body.dataset.world;
@@ -98,8 +99,10 @@ async function openShared(code) {
     $('#shared-bar').hidden = false; $('#shared-title').textContent = q.title;
     $('#shared-save').onclick = async () => { await saveQuiz(Object.assign({}, q)); $('#shared-save').disabled = true; $('#shared-save').textContent = 'Gemt'; };
     localSelf(q, true);
+    document.body.classList.add('in-game');
   } catch (e) {
-    toast('Øvelinket virker ikke. Bed om et nyt link.'); go('#quizzer');
+    show('v-self'); document.body.classList.add('in-game'); $('#shared-bar').hidden = true;
+    $('#self-root').innerHTML = '<div class="state bad"><h2>Linket virker ikke</h2><p>Bed din lærer om et nyt øvelink.</p></div>';
   }
 }
 
@@ -214,7 +217,6 @@ async function init() {
   $('#go-home').onclick = $('#nav-lib').onclick = () => go('#quizzer');
   $('#nav-join').onclick = () => go('#deltag');
   $('#nav-snd').onclick = () => { sound.on = !sound.on; lsSet('kqa.sound', sound.on); setSoundBtn(); SFX.coin(); };
-  $('#shared-close').onclick = () => { $('#shared-bar').hidden = true; go('#quizzer'); };
   setSoundBtn();
   window.addEventListener('hashchange', () => { if (!location.hash.startsWith('#ov=')) $('#shared-bar').hidden = true; route(); });
   OWN = await loadAll();

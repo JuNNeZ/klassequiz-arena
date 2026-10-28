@@ -1,7 +1,7 @@
 // ELEV: deltag med kode og navn, vælg figur, spil i eget tempo. Ingen login.
-import { $, $$, esc, SFX, cleanName, lsGet, lsSet, fmt } from './util.js';
+import { $, $$, esc, SFX, cleanName, lsGet, lsSet, fmt, confirmClick } from './util.js';
 import { TEAMS, MODES, TOWERS, TOWER_TYPES, MAX_LVL, upgradeCost, towerSpent, simWave, fmtKg } from './modes.js';
-import { tilesHTML, questionHTML, chestsHTML, catchHTML, drawTowerField, slotAt } from './ui.js';
+import { tilesHTML, questionHTML, chestsHTML, catchHTML, drawTowerField, slotAt, shapeSVG } from './ui.js';
 import { avatarSVG, avatarName, AVATAR_COUNT } from './avatars.js';
 import { Client, p2pAvailable } from './net.js';
 import { UNITS, UNIT_TYPES, newBattle, spawn, step, newAI, aiStep, drawBattle, TICK_MS, unitIconSVG, UPGRADES, UPGRADE_KEYS } from './war.js';
@@ -11,7 +11,7 @@ let autoT = 0, clockT = 0, anim = 0, warT = 0, warRaf = 0;
 const ROBOT_AV = 16;
 
 function sid() {
-  try { let s = sessionStorage.getItem('kqa.sid'); if (!s) { s = 's' + Math.random().toString(36).slice(2, 12); sessionStorage.setItem('kqa.sid', s); } return s; }
+  try { let s = localStorage.getItem('kqa.sid'); if (!s) { s = 's' + Math.random().toString(36).slice(2, 12); localStorage.setItem('kqa.sid', s); } return s; }
   catch (e) { return 's' + Math.random().toString(36).slice(2, 12); }
 }
 
@@ -28,6 +28,7 @@ export function initJoin() {
 function join() {
   const err = $('#j-err'); err.hidden = true;
   const code = $('#j-code').value.trim(), name = cleanName($('#j-name').value);
+  $('#j-code').classList.remove('bad-field');
   if (!/^\d{4}$/.test(code)) { err.textContent = 'Skriv den firecifrede kode fra tavlen.'; err.hidden = false; return; }
   if (!name) { err.textContent = 'Skriv dit navn.'; err.hidden = false; return; }
   if (!p2pAvailable()) { err.textContent = 'Siden kunne ikke indlæse forbindelsen. Genindlæs siden.'; err.hidden = false; return; }
@@ -41,6 +42,7 @@ function join() {
     onStatus: (st, diag) => {
       if (!P) return;
       P.status = st; P.diag = diag;
+      if (st === 'notfound' && !P.s) { P.nf = (P.nf || 0) + 1; if (P.nf >= 2) { const c = P.code; leave(); const e = $('#j-err'); e.textContent = `Der er ikke noget spil med koden ${c}. Tjek tallene på tavlen.`; e.hidden = false; $('#j-code').classList.add('bad-field'); $('#j-code').focus(); $('#j-code').select(); return; } }
       if (st === 'open') P.client.send({ t: 'hello', sid: P.sid, nm: P.name, av: P.av });
       if (!P.s || st === 'lost') render();
     },
@@ -77,14 +79,14 @@ function onData(d) {
       if (d.phase === 'play' && d.mode === 'war' && !P.warLoop) P.warLoop = true;
       break;
     }
-    case 'q': P.q = { n: d.n, ...d.q, t0: performance.now() }; P.view = 'q'; break;
+    case 'q': P.q = { n: d.n, ...d.q, t0: performance.now(), shownAt: performance.now() }; P.view = 'q'; break;
     case 'res':
       if (!P.q || d.n !== P.q.n) return;
       P.res = d; (d.ok ? SFX.good : SFX.bad)();
       if (d.ok && d.fx && d.fx.gold && P.s.mode === 'warsolo' && P.ws) P.ws.gold += d.fx.gold;
       if (d.ok && d.fx && d.fx.chest) P.view = 'chest';
       else if (d.ok && d.fx && d.fx.fish) { P.view = 'cast'; setTimeout(() => { if (P && P.view === 'cast') { P.view = 'res'; SFX.splash(); render(); auto(2200); } }, 1100); }
-      else { P.view = 'res'; auto(d.ok ? 1300 : 2600); }
+      else { P.view = 'res'; if (d.ok) auto(1600); }
       break;
     case 'chestres':
       P.chest = d; P.view = 'chestres'; (d.d >= 0 ? SFX.coin : SFX.bad)(); auto(1900); break;
@@ -98,7 +100,7 @@ function onData(d) {
     case 'wave':
       P.wave = { w: d.w, towers: d.towers, res: d.res, done: false };
       if (P.q && P.view === 'q' && !P.q.pausedAt) P.q.pausedAt = performance.now();
-      P.building = false; clearTimeout(autoT); startWave(); return;
+      P.wasBuilding = P.building; P.building = false; clearTimeout(autoT); startWave(); return;
     case 'done': P.view = 'done'; break;
     case 'war': P.war = d; warMini(); shopRefresh(); return;
     case 'coop': {
@@ -131,7 +133,12 @@ function clock() {
   const c = $('#p-clock');
   if (c && P.endAt) { const s = Math.max(0, Math.ceil((P.endAt - Date.now()) / 1000)); c.textContent = Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
   const w = $('#p-nextwave');
-  if (w && P.me && P.me.nextWave != null) { const s = Math.max(0, Math.ceil((P.me.nextWave - (Date.now() - P.meAt)) / 1000)); w.textContent = s ? `Næste bølge om ${s} s` : 'Bølgen kommer!'; }
+  if (P.me && P.me.nextWave != null && P.s && P.s.mode === 'tower') {
+    const s = Math.max(0, Math.ceil((P.me.nextWave - (Date.now() - P.meAt)) / 1000));
+    if (w) w.textContent = s ? `Næste bølge om ${s} s` : 'Bølgen kommer!';
+    if (s > 0 && s <= 6 && !P.warned) { P.warned = true; banner(P.me.towers && P.me.towers.length ? `Monstre om ${s} sekunder!` : `Monstre om ${s} sekunder. Byg et tårn!`, 'bad'); }
+    if (s > 6) P.warned = false;
+  }
 }
 
 /* ---------- visning ---------- */
@@ -143,7 +150,7 @@ function diagHTML() {
 }
 function msg(h, p, cls, withDiag) {
   root().innerHTML = `<div class="state ${cls || ''}"><h2>${esc(h)}</h2>${p ? `<p class="muted">${esc(p)}</p>` : ''}${withDiag ? diagHTML() : ''}</div><div class="row center-row"><button class="btn ghost" id="p-leave" type="button">Forlad spillet</button></div>`;
-  $('#p-leave').onclick = leave;
+  $('#p-leave').onclick = () => confirmClick($('#p-leave'), 'Vil du gå ud af spillet? Tryk igen', leave);
 }
 function statLine(me, mode, s) {
   if (!me) return '';
@@ -161,7 +168,7 @@ function topHTML() {
   const s = P.s, me = P.me || {};
   const team = me.team >= 0 && s.teams && s.teams[me.team] ? `<span class="badge"><i style="background:${TEAMS[me.team].c}"></i>${esc(s.teams[me.team].n)}</span>` : '';
   const lost = P.status === 'lost' ? '<p class="note">Forbindelsen er tabt. Prøver igen…</p>' : '';
-  return `<div class="me-bar" id="p-top"><span>${avatarSVG(P.av, 28)}<b>${esc(P.name)}</b> ${team}</span><span class="num">${statLine(me, s.mode, s)}${P.rank && s.phase === 'play' && s.mode !== 'self' ? ` · <b>nr. ${P.rank}</b>` : ''}${P.endAt && s.phase === 'play' ? ` · <span id="p-clock"></span>` : ''}</span></div>${duelHTML()}${lost}<div id="p-banner" class="p-banner" hidden></div>`;
+  return `<div class="me-bar" id="p-top"><span>${avatarSVG(P.av, 28)}<b>${esc(P.name)}</b> ${team}</span><span class="num">${statLine(me, s.mode, s)}${P.rank && s.phase === 'play' && !['self', 'warcoop'].includes(s.mode) && (me.correct || 0) > 0 ? ` · <b>nr. ${P.rank}</b>` : ''}${P.endAt && s.phase === 'play' ? ` · <span id="p-clock"></span>` : ''}</span></div>${duelHTML()}${lost}<div id="p-banner" class="p-banner" hidden></div>`;
 }
 function refreshTop() {
   const t = $('#p-top'); if (!t) return;
@@ -223,7 +230,7 @@ function lobbyView(s) {
     <div class="av-pick" role="group" aria-label="Vælg figur">${Array.from({ length: AVATAR_COUNT }, (_, i) => `<button class="av-b" type="button" data-av="${i}" aria-pressed="${i === P.av}" aria-label="${esc(avatarName(i))}">${avatarSVG(i, 56)}</button>`).join('')}</div>
     <div class="row center-row"><button class="btn ghost" id="p-leave" type="button">Forlad spillet</button></div>`;
   $$('#play .av-b').forEach(b => { b.onclick = () => { P.av = +b.dataset.av; lsSet('kqa.av', P.av); P.client.send({ t: 'av', av: P.av }); SFX.join(); lobbyView(s); }; });
-  $('#p-leave').onclick = leave;
+  $('#p-leave').onclick = () => confirmClick($('#p-leave'), 'Vil du gå ud af spillet? Tryk igen', leave);
 }
 
 function questionView() {
@@ -233,8 +240,8 @@ function questionView() {
   if (q.sent) $$('#play .tile').forEach(x => { x.disabled = true; });
   $$('#play .tile').forEach(b => {
     b.onclick = () => {
-      if (P.q.sent) return;
-      P.q.sent = true; b.classList.add('picked');
+      if (P.q.sent || performance.now() - (P.q.shownAt || 0) < 450) return;
+      P.q.sent = true; P.q.picked = +b.dataset.i; b.classList.add('picked');
       $$('#play .tile').forEach(x => { x.disabled = true; });
       P.client.send({ t: 'ans', n: q.n, c: +b.dataset.i, ms: Math.round(performance.now() - q.t0) });
     };
@@ -246,6 +253,7 @@ function questionView() {
     if (!P || P.view !== 'q' || P.q !== q || P.building || P.wave) return;
     const l = Math.max(0, 1 - (performance.now() - q.t0) / dur), tb = $('#p-tb');
     if (tb) tb.style.width = (l * 100) + '%';
+    if (l <= 0 && !q.timedOut) { q.timedOut = true; const n = document.createElement('p'); n.className = 'note timeup'; n.textContent = 'Tiden er gået. Vælg et svar for at komme videre.'; const t = $('#play .tiles'); if (t) t.before(n); }
     anim = requestAnimationFrame(step);
   };
   anim = requestAnimationFrame(step);
@@ -265,7 +273,10 @@ function resultView() {
   if (!d.ok && s.mode === 'self') p = 'Spørgsmålet kommer igen senere.';
   if (d.ok && fx.gold) p = `+${fx.gold} guld`;
   if (!d.ok && fx.penalty) p = `Computeren fik ${fx.penalty} guld ekstra.`;
-  r.innerHTML = `${topHTML()}${warHTML()}<div class="state ${d.ok ? 'good' : 'bad'} pop"><h2>${esc(h)}</h2>${p ? `<p>${esc(p)}</p>` : ''}${extra}${!d.ok && right.length ? `<p class="muted">Rigtigt svar: <b>${right.map(esc).join(' / ')}</b></p>` : ''}</div><div class="row center-row"><button class="btn primary big" id="p-next" type="button">Næste</button></div>`;
+  const mine = q && q.picked != null ? q.opts[q.picked] : null;
+  const wrongInfo = !d.ok && right.length ? `<div class="answer-fix">${mine != null ? `<p>Du svarede <span class="ans-chip">${shapeSVG(q.picked)}${esc(mine)}</span></p>` : ''}<p>Det rigtige svar er ${(d.correct || []).map(i => `<span class="ans-chip ok">${shapeSVG(i)}${esc(q.opts[i])}</span>`).join(' eller ')}</p></div>` : '';
+  const fishFirst = d.ok && fx.fish;
+  r.innerHTML = `${topHTML()}${warHTML()}<div class="state ${d.ok ? 'good' : 'bad'} pop"><h2>${esc(h)}</h2>${fishFirst ? extra : ''}${p ? `<p>${esc(p)}</p>` : ''}${fishFirst ? '' : extra}${wrongInfo}</div><div class="row center-row"><button class="btn primary big" id="p-next" type="button">${d.ok ? 'Næste' : 'Forstået – næste'}</button></div>`;
   $('#p-next').onclick = nextQ;
   bindShop();
   clock();
@@ -278,8 +289,8 @@ function endView(s) {
   if (s.mode === 'war' && s.winTeam != null) teamLine = `<p><b>Hold ${esc(TEAMS[s.winTeam].n)} vandt slaget.</b> ${me.team === s.winTeam ? 'Det var jeres hold!' : ''}</p><p class="muted">Du fældede ${me.kills || 0} fjender.</p>`;
   if (s.mode === 'warcoop') teamLine = `<p><b>${s.coopWon ? 'Computerens statue faldt.' : 'Computeren vandt denne gang.'}</b></p><p class="muted">Du brugte ${me.spent || 0} guld på hæren.</p>`;
   if (s.mode === 'warsolo' && P.ws) teamLine = `<p>Du vandt ${P.ws.wins} ${P.ws.wins === 1 ? 'slag' : 'slag'} og nåede slag ${P.ws.stage}.</p>`;
-  r.innerHTML = `<div class="state ${(s.mode === 'warcoop' ? s.coopWon : s.rank === 1 && s.mode !== 'self') ? 'good' : 'plain'} pop"><div class="lobby-av">${avatarSVG(P.av, 96)}</div><h2>${s.mode === 'self' ? 'Godt arbejde!' : s.mode === 'warcoop' ? (s.coopWon ? 'Klassen vandt!' : 'Godt kæmpet!') : s.rank === 1 ? 'Du vandt!' : 'Godt spillet!'}</h2>${s.mode !== 'self' ? `<p>Du blev nr. <b>${s.rank}</b> af ${s.n}</p>` : ''}<p class="muted">${esc(statLine(me, s.mode, s))} · ${me.correct}/${me.answered} rigtige svar</p>${teamLine}</div><div class="row center-row"><button class="btn" id="p-leave" type="button">Forlad spillet</button></div>`;
-  $('#p-leave').onclick = leave;
+  r.innerHTML = `<div class="state ${(s.mode === 'warcoop' ? s.coopWon : s.rank === 1 && s.mode !== 'self') ? 'good' : 'plain'} pop"><div class="lobby-av">${avatarSVG(P.av, 96)}</div><h2>${s.mode === 'self' ? 'Godt arbejde!' : s.mode === 'warcoop' ? (s.coopWon ? 'Klassen vandt!' : 'Godt kæmpet!') : s.rank === 1 ? 'Du vandt!' : 'Godt spillet!'}</h2>${s.mode !== 'self' ? `<p>Du blev nr. <b>${s.rank}</b> af ${s.n}</p>` : ''}<p class="muted">${esc(statLine(me, s.mode, s))} · ${me.correct} ud af ${me.answered} rigtige</p>${teamLine}</div><div class="row center-row"><button class="btn" id="p-leave" type="button">Forlad spillet</button></div>`;
+  $('#p-leave').onclick = () => confirmClick($('#p-leave'), 'Vil du gå ud af spillet? Tryk igen', leave);
 }
 
 /* ---------- Tårnforsvar ---------- */
@@ -289,7 +300,7 @@ function buildView() {
   const coins = me.coins || 0;
   const t = P.towers.find(x => x.slot === P.sel);
   let shop;
-  if (!t) shop = `<div class="shop">${TOWER_TYPES.map(k => `<button class="shop-b" data-buy="${k}" type="button"${coins < TOWERS[k].cost ? ' disabled' : ''}><i style="background:${TOWERS[k].c}"></i><b>${TOWERS[k].n}</b><span>${TOWERS[k].cost} mønter</span><small>${k === 'archer' ? 'Hurtige pile' : k === 'ice' ? 'Gør monstre langsomme' : 'Stor skade, langsom'}</small></button>`).join('')}</div>`;
+  if (!t) shop = `<div class="shop">${TOWER_TYPES.map(k => `<button class="shop-b" data-buy="${k}" type="button"${coins < TOWERS[k].cost ? ' disabled' : ''}><i style="background:${TOWERS[k].c}"></i><b><span class="tw-letter">${k === 'archer' ? 'B' : k === 'ice' ? 'I' : 'K'}</span> ${TOWERS[k].n}</b><span>${TOWERS[k].cost} mønter</span><small>${k === 'archer' ? 'Hurtige pile' : k === 'ice' ? 'Gør monstre langsomme' : 'Stor skade, langsom'}</small></button>`).join('')}</div>`;
   else {
     const up = t.lvl < MAX_LVL ? upgradeCost(t.type, t.lvl) : 0;
     shop = `<div class="shop one"><p><b>${TOWERS[t.type].n}</b> · niveau ${t.lvl}</p><div class="row center-row">${t.lvl < MAX_LVL ? `<button class="btn primary" id="tw-up" type="button"${coins < up ? ' disabled' : ''}>Opgradér · ${up} mønter</button>` : '<span class="muted">Maks niveau</span>'}<button class="btn ghost" id="tw-sell" type="button">Sælg (+${towerSpent([t])})</button></div></div>`;
@@ -334,7 +345,7 @@ function startWave() {
       (res.leaked ? SFX.bad : SFX.good)();
       setTimeout(() => {
         if (!P || P.wave !== w) return;
-        P.wave = null; resumeQ();
+        P.wave = null; if (P.wasBuilding) { P.building = true; P.wasBuilding = false; render(); return; } resumeQ();
         if (P.view === 'res' || P.view === 'chestres') { render(); auto(800); } else render();
       }, 1800);
     }
@@ -347,7 +358,7 @@ const isWarMode = () => P && P.s && (P.s.mode === 'war' || P.s.mode === 'warsolo
 function myGold() { return P.s.mode === 'warsolo' ? Math.floor(P.ws ? P.ws.gold : 0) : ((P.me && P.me.gold) || 0); }
 function shopHTML() {
   const g = myGold(), col = P.s.mode === 'warcoop' ? '#3a8fdc' : P.s.mode === 'war' ? ['#e5574c', '#3a8fdc'][(P.me && P.me.team) || 0] : '#3a8fdc';
-  return `<div class="war-shop" id="war-shop">${UNIT_TYPES.map(k => `<button class="unit-b" data-unit="${k}" type="button"${g < UNITS[k].cost ? ' disabled' : ''}>${unitIconSVG(k, col)}<b>${UNITS[k].n}</b><span>${UNITS[k].cost}</span></button>`).join('')}</div>`;
+  return `<div class="war-shop" id="war-shop">${UNIT_TYPES.map(k => `<button class="unit-b" data-unit="${k}" type="button"${g < UNITS[k].cost ? ' disabled' : ''}>${unitIconSVG(k, col)}<b>${UNITS[k].n}</b><span>${UNITS[k].cost} guld</span><small>${UNITS[k].desc}</small></button>`).join('')}</div>${g < UNITS.sword.cost ? `<p class="shop-hint">Svar rigtigt for at få guld. Du mangler ${UNITS.sword.cost - g} guld til en sværdkriger.</p>` : ''}`;
 }
 function warHTML() {
   if (!isWarMode() || P.s.phase !== 'play') return '';
@@ -360,8 +371,8 @@ function warMiniInner() {
   const me = P.me || {}, t = me.team >= 0 ? me.team : 0;
   const bar = i => `<span class="sbar" style="--tc:${TEAMS[i].c}"><i style="width:${Math.max(0, w.st[i]) / w.max * 100}%"></i></span>`;
   const f0 = Math.round(w.front[0] * 100), f1 = Math.round(w.front[1] * 100);
-  return `<div class="wm-row"><b style="color:${TEAMS[0].c}">Rød</b>${bar(0)}${bar(1)}<b style="color:${TEAMS[1].c}">Blå</b></div>
-    <div class="wm-field"><i class="wm-f0" style="width:${f0}%"></i><i class="wm-f1" style="width:${f1}%"></i></div>
+  return `<span class="wm-lbl">Statuernes liv</span><div class="wm-row"><b style="color:${TEAMS[0].c}">Rød</b>${bar(0)}${bar(1)}<b style="color:${TEAMS[1].c}">Blå</b></div>
+    <span class="wm-lbl">Hvor langt hærene er nået</span><div class="wm-field"><i class="wm-f0" style="width:${f0}%"></i><i class="wm-f1" style="width:${f1}%"></i></div>
     <p class="small muted center">Du har ${w.mine} ${w.mine === 1 ? 'soldat' : 'soldater'} på slagmarken${t === 0 ? ' for Rød' : ' for Blå'} · ${me.kills || 0} fældet</p>`;
 }
 function warMini() { const m = $('#war-mini'); if (m) m.innerHTML = warMiniInner(); }
@@ -440,7 +451,7 @@ function coopShopView() {
     const u = c.upg[k], def = UPGRADES[k], full = u.lvl >= u.max, need = u.cost - u.paid;
     return `<div class="upg-card"><div><b>${esc(def.n)}</b>${u.max < 99 ? ` <span class="muted small">niveau ${u.lvl}/${u.max}</span>` : ''}<p class="small muted">${esc(def.desc)}</p></div>
       <span class="ptrack"><i style="width:${full ? 100 : u.paid / u.cost * 100}%"></i></span>
-      <div class="row">${full ? '<span class="muted small">Fuld</span>' : `<span class="small">${u.paid} / ${u.cost}</span><button class="btn" data-upg="${k}" data-amt="50" type="button"${g < 1 ? ' disabled' : ''}>+50</button><button class="btn" data-upg="${k}" data-amt="${need}" type="button"${g < 1 ? ' disabled' : ''}>Betal resten${need > g ? ` (${g})` : ''}</button>`}</div></div>`;
+      <div class="row">${full ? '<span class="muted small">Fuld</span>' : `<span class="small">${u.paid} / ${u.cost}</span><button class="btn" data-upg="${k}" data-amt="50" type="button"${g < 1 ? ' disabled' : ''}>+50 guld</button><button class="btn" data-upg="${k}" data-amt="${need}" type="button"${g < 1 ? ' disabled' : ''}>${need > g ? `Giv alt (${g} guld)` : `Betal resten (${need} guld)`}</button>`}</div></div>`;
   }).join('');
   r.innerHTML = `${topHTML()}<div class="war-mini" id="coop-shop"><div class="coop-head"><b>Butikken er åben</b><span>Kampen starter om <b class="coop-left">${coopLeft()}</b> s</span></div>${coopBars()}<p class="small muted">${c.queued} nye soldater er klar · hæren har ${c.army}</p></div>
     <h3 class="sub-h">Soldater til næste kamp</h3>${shopHTML()}

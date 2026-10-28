@@ -104,6 +104,11 @@ function onMsg(conn, d) {
     conn._sid = sid;
     let p = H.players.get(sid);
     if (!p) {
+      // Samme navn igen fra en ny fane/enhed: genbrug eleven, hvis den gamle forbindelse er væk
+      const old = [...H.players.values()].find(x => !x.online && !H.banned.has(x.sid) && x.nm.toLowerCase() === nm.toLowerCase());
+      if (old) { H.players.delete(old.sid); old.sid = sid; H.players.set(sid, old); p = old; }
+    }
+    if (!p) {
       let team = -1;
       if (H.teamsN) { const cnt = Array(H.teamsN).fill(0); H.players.forEach(x => { if (x.team >= 0) cnt[x.team]++; }); team = cnt.indexOf(Math.min(...cnt)); }
       p = newPlayer(sid, nm, team);
@@ -114,7 +119,11 @@ function onMsg(conn, d) {
     p.nm = nm; p.conn = conn; p.online = true;
     if (Number.isInteger(d.av) && d.av >= 0 && d.av < AVATAR_COUNT) p.av = d.av;
     sendState(p);
-    if (H.phase === 'play' && p.cur != null) send(p, { t: 'q', n: p.n, q: qMsg(p.cur) });
+    if (H.phase === 'play' && p.cur != null) {
+      send(p, { t: 'q', n: p.n, q: qMsg(p.cur) });
+      // Genindlæst efter svar: vis resultatet igen, så eleven ikke sidder fast
+      if (p.answeredCur && p.lastRes) send(p, p.lastRes);
+    }
     if (H.mode === 'duel' && H.phase === 'play') ensureDuels();
     dirty(); return;
   }
@@ -192,7 +201,8 @@ function answer(p, c, ms) {
     if (H.mode === 'warcoop' && H.coop && ok) H.coop.right++;
   }
   if (p.streak > 0 && p.streak % 5 === 0) feed(p, `har en stime på <b>${p.streak}</b> rigtige i træk`);
-  send(p, { t: 'res', n: p.n, ok, c, correct: ci, fx, me: meOf(p), rank: rankOf(p) });
+  p.lastRes = { t: 'res', n: p.n, ok, c, correct: ci, fx, me: meOf(p), rank: rankOf(p) };
+  send(p, p.lastRes);
   dirty();
 }
 function chest(p, k) {
@@ -205,6 +215,7 @@ function chest(p, k) {
     send(v, { t: 'note', txt: r.ttxt, me: meOf(v) });
     feed(p, esc(r.txt.replace('Du ', '').replace('!', '')));
   }
+  p.lastRes = { ...p.lastRes, fx: { ...(p.lastRes && p.lastRes.fx), chest: false } };
   send(p, { t: 'chestres', n: p.n, k, kind: r.kind, txt: r.txt, d: r.d, me: meOf(p), rank: rankOf(p) });
   dirty();
 }
