@@ -18,7 +18,7 @@ function render() {
   const s = SS; s.answered = false;
   if (s.i >= s.qs.length) return end();
   const q = s.qs[s.i];
-  s.root.innerHTML = `<div class="me-bar"><span>${esc(s.title)}${s.round > 1 ? ' · øv de forkerte' : ''}</span><span class="num"><b>${s.i + 1}</b> / ${s.qs.length}</span></div>
+  s.root.innerHTML = `<div class="me-bar"><span>${esc(s.title)}${s.round > 1 ? ', øv de forkerte' : ''}</span><span class="num"><b>${s.i + 1}</b> / ${s.qs.length}</span></div>
     <div class="tbar"><i style="width:${s.i / s.qs.length * 100}%"></i></div>
     ${questionHTML(q.q, { img: q.img, multi: q.c.length > 1, size: 'phone', pop: true })}${tilesHTML(q.opts, { buttons: true })}<p class="feedback" id="fb" aria-live="polite"></p>`;
   $$('.tile', s.root).forEach(b => { b.onclick = () => answer(+b.dataset.i); });

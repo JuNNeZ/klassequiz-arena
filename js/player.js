@@ -146,7 +146,7 @@ const root = () => $('#play');
 function diagHTML() {
   const d = P && P.diag; if (!d) return '';
   const mark = v => v === 'ok' ? '<b class="ok-c">✓</b>' : v === 'fail' ? '<b class="bad-c">✕</b>' : '<span class="muted">…</span>';
-  return `<ul class="diag"><li>${mark(d.server)} Forbindelse til netværket</li><li>${mark(d.host)} Forbindelse til lærerens skærm${d.tries > 1 ? ` · forsøg ${d.tries}` : ''}${d.relay ? ' · via relæ' : ''}</li></ul>`;
+  return `<ul class="diag"><li>${mark(d.server)} Forbindelse til netværket</li><li>${mark(d.host)} Forbindelse til lærerens skærm${d.tries > 1 ? `, forsøg ${d.tries}` : ''}${d.relay ? ', via relæ' : ''}</li></ul>`;
 }
 function msg(h, p, cls, withDiag) {
   root().innerHTML = `<div class="state ${cls || ''}"><h2>${esc(h)}</h2>${p ? `<p class="muted">${esc(p)}</p>` : ''}${withDiag ? diagHTML() : ''}</div><div class="row center-row"><button class="btn ghost" id="p-leave" type="button">Forlad spillet</button></div>`;
@@ -156,19 +156,19 @@ function statLine(me, mode, s) {
   if (!me) return '';
   if (mode === 'race') return `Felt ${me.pos} af ${s.goal}`;
   if (mode === 'fish') return fmtKg(me.kg) + ' kg';
-  if (mode === 'tower') return `${me.coins} mønter · ${me.hp} ♥`;
+  if (mode === 'tower') return `${me.coins} mønter, ${me.hp} ♥`;
   if (mode === 'gold') return fmt(me.score) + ' guld';
   if (mode === 'duel') return `${me.wins} ${me.wins === 1 ? 'sejr' : 'sejre'}`;
   if (mode === 'self') return `${me.correct} rigtige`;
   if (mode === 'war' || mode === 'warcoop') return `${me.gold} guld`;
-  if (mode === 'warsolo') return P.ws ? `${Math.floor(P.ws.gold)} guld · slag ${P.ws.stage}` : '';
+  if (mode === 'warsolo') return P.ws ? `${Math.floor(P.ws.gold)} guld, slag ${P.ws.stage}` : '';
   return fmt(me.score) + ' point';
 }
 function topHTML() {
   const s = P.s, me = P.me || {};
   const team = me.team >= 0 && s.teams && s.teams[me.team] ? `<span class="badge"><i style="background:${TEAMS[me.team].c}"></i>${esc(s.teams[me.team].n)}</span>` : '';
   const lost = P.status === 'lost' ? '<p class="note">Forbindelsen er tabt. Prøver igen…</p>' : '';
-  return `<div class="me-bar" id="p-top"><span>${avatarSVG(P.av, 28)}<b>${esc(P.name)}</b> ${team}</span><span class="num">${statLine(me, s.mode, s)}${P.rank && s.phase === 'play' && !['self', 'warcoop'].includes(s.mode) && (me.correct || 0) > 0 ? ` · <b>nr. ${P.rank}</b>` : ''}${P.endAt && s.phase === 'play' ? ` · <span id="p-clock"></span>` : ''}</span></div>${duelHTML()}${lost}<div id="p-banner" class="p-banner" hidden></div>`;
+  return `<div class="me-bar" id="p-top"><span>${avatarSVG(P.av, 28)}<b>${esc(P.name)}</b> ${team}</span><span class="num">${statLine(me, s.mode, s)}${P.rank && s.phase === 'play' && !['self', 'warcoop'].includes(s.mode) && (me.correct || 0) > 0 ? `, <b>nr. ${P.rank}</b>` : ''}${P.endAt && s.phase === 'play' ? `, <span id="p-clock"></span>` : ''}</span></div>${duelHTML()}${lost}<div id="p-banner" class="p-banner" hidden></div>`;
 }
 function refreshTop() {
   const t = $('#p-top'); if (!t) return;
@@ -176,7 +176,7 @@ function refreshTop() {
   t.replaceWith(tmp.querySelector('#p-top'));
   const dv = $('#p-duel'), ndv = tmp.querySelector('#p-duel');
   if (dv && ndv) dv.replaceWith(ndv); else if (!dv && ndv) $('#p-top').after(ndv);
-  const bb = $('#p-build'); if (bb && P.me) bb.textContent = `Byg tårne · ${P.me.coins} mønter`;
+  const bb = $('#p-build'); if (bb && P.me) bb.textContent = `Byg tårne, ${P.me.coins} mønter`;
   clock();
 }
 function duelHTML() {
@@ -235,7 +235,7 @@ function lobbyView(s) {
 
 function questionView() {
   const q = P.q, s = P.s, r = root();
-  const tower = s.mode === 'tower' ? `<div class="tw-bar"><span id="p-nextwave" class="muted small"></span><button class="btn" id="p-build" type="button">Byg tårne · ${P.me ? P.me.coins : 0} mønter</button></div>` : '';
+  const tower = s.mode === 'tower' ? `<div class="tw-bar"><span id="p-nextwave" class="muted small"></span><button class="btn" id="p-build" type="button">Byg tårne, ${P.me ? P.me.coins : 0} mønter</button></div>` : '';
   r.innerHTML = `${topHTML()}${tower}${warHTML()}<div class="tbar"><i id="p-tb" style="width:100%"></i></div>${questionHTML(q.text, { img: isWarMode() ? null : q.img, multi: q.multi, size: 'phone' })}${tilesHTML(q.opts, { buttons: true })}`;
   if (q.sent) $$('#play .tile').forEach(x => { x.disabled = true; });
   $$('#play .tile').forEach(b => {
@@ -265,7 +265,7 @@ function resultView() {
   const q = P.q;
   const right = (d.correct || []).map(i => q && q.opts[i]).filter(Boolean);
   let h = d.ok ? 'Rigtigt!' : 'Forkert', p = '', extra = '';
-  if (d.ok && fx.pts) p = `+${fmt(fx.pts)} point${me.streak >= 2 ? ` · stime ${me.streak}` : ''}`;
+  if (d.ok && fx.pts) p = `+${fmt(fx.pts)} point${me.streak >= 2 ? `, stime ${me.streak}` : ''}`;
   if (d.ok && fx.steps) { p = `+${fx.steps} ${fx.steps === 1 ? 'felt' : 'felter'}`; extra = `<div class="mini-race"><i style="width:${Math.min(100, me.pos / s.goal * 100)}%"></i></div><p class="muted center">Felt ${me.pos} af ${s.goal}</p>`; }
   if (d.ok && fx.fish) { extra = catchHTML(fx.fish); h = fx.fish.junk ? 'Øv, en gammel støvle!' : 'Bid!'; p = `Samlet fangst: ${fmtKg(me.kg)} kg`; }
   if (d.ok && fx.coins) p = `+${fx.coins} mønter`;
@@ -276,7 +276,7 @@ function resultView() {
   const mine = q && q.picked != null ? q.opts[q.picked] : null;
   const wrongInfo = !d.ok && right.length ? `<div class="answer-fix">${mine != null ? `<p>Du svarede <span class="ans-chip">${shapeSVG(q.picked)}${esc(mine)}</span></p>` : ''}<p>Det rigtige svar er ${(d.correct || []).map(i => `<span class="ans-chip ok">${shapeSVG(i)}${esc(q.opts[i])}</span>`).join(' eller ')}</p></div>` : '';
   const fishFirst = d.ok && fx.fish;
-  r.innerHTML = `${topHTML()}${warHTML()}<div class="state ${d.ok ? 'good' : 'bad'} pop"><h2>${esc(h)}</h2>${fishFirst ? extra : ''}${p ? `<p>${esc(p)}</p>` : ''}${fishFirst ? '' : extra}${wrongInfo}</div><div class="row center-row"><button class="btn primary big" id="p-next" type="button">${d.ok ? 'Næste' : 'Forstået – næste'}</button></div>`;
+  r.innerHTML = `${topHTML()}${warHTML()}<div class="state ${d.ok ? 'good' : 'bad'} pop"><h2>${esc(h)}</h2>${fishFirst ? extra : ''}${p ? `<p>${esc(p)}</p>` : ''}${fishFirst ? '' : extra}${wrongInfo}</div><div class="row center-row"><button class="btn primary big" id="p-next" type="button">${d.ok ? 'Næste' : 'Forstået, næste spørgsmål'}</button></div>`;
   $('#p-next').onclick = nextQ;
   bindShop();
   clock();
@@ -289,7 +289,7 @@ function endView(s) {
   if (s.mode === 'war' && s.winTeam != null) teamLine = `<p><b>Hold ${esc(TEAMS[s.winTeam].n)} vandt slaget.</b> ${me.team === s.winTeam ? 'Det var jeres hold!' : ''}</p><p class="muted">Du fældede ${me.kills || 0} fjender.</p>`;
   if (s.mode === 'warcoop') teamLine = `<p><b>${s.coopWon ? 'Computerens statue faldt.' : 'Computeren vandt denne gang.'}</b></p><p class="muted">Du brugte ${me.spent || 0} guld på hæren.</p>`;
   if (s.mode === 'warsolo' && P.ws) teamLine = `<p>Du vandt ${P.ws.wins} ${P.ws.wins === 1 ? 'slag' : 'slag'} og nåede slag ${P.ws.stage}.</p>`;
-  r.innerHTML = `<div class="state ${(s.mode === 'warcoop' ? s.coopWon : s.rank === 1 && s.mode !== 'self') ? 'good' : 'plain'} pop"><div class="lobby-av">${avatarSVG(P.av, 96)}</div><h2>${s.mode === 'self' ? 'Godt arbejde!' : s.mode === 'warcoop' ? (s.coopWon ? 'Klassen vandt!' : 'Godt kæmpet!') : s.rank === 1 ? 'Du vandt!' : 'Godt spillet!'}</h2>${s.mode !== 'self' ? `<p>Du blev nr. <b>${s.rank}</b> af ${s.n}</p>` : ''}<p class="muted">${esc(statLine(me, s.mode, s))} · ${me.correct} ud af ${me.answered} rigtige</p>${teamLine}</div><div class="row center-row"><button class="btn" id="p-leave" type="button">Forlad spillet</button></div>`;
+  r.innerHTML = `<div class="state ${(s.mode === 'warcoop' ? s.coopWon : s.rank === 1 && s.mode !== 'self') ? 'good' : 'plain'} pop"><div class="lobby-av">${avatarSVG(P.av, 96)}</div><h2>${s.mode === 'self' ? 'Godt arbejde!' : s.mode === 'warcoop' ? (s.coopWon ? 'Klassen vandt!' : 'Godt kæmpet!') : s.rank === 1 ? 'Du vandt!' : 'Godt spillet!'}</h2>${s.mode !== 'self' ? `<p>Du blev nr. <b>${s.rank}</b> af ${s.n}</p>` : ''}<p class="muted">${esc(statLine(me, s.mode, s))}, ${me.correct} ud af ${me.answered} rigtige</p>${teamLine}</div><div class="row center-row"><button class="btn" id="p-leave" type="button">Forlad spillet</button></div>`;
   $('#p-leave').onclick = () => confirmClick($('#p-leave'), 'Vil du gå ud af spillet? Tryk igen', leave);
 }
 
@@ -303,9 +303,9 @@ function buildView() {
   if (!t) shop = `<div class="shop">${TOWER_TYPES.map(k => `<button class="shop-b" data-buy="${k}" type="button"${coins < TOWERS[k].cost ? ' disabled' : ''}><i style="background:${TOWERS[k].c}"></i><b><span class="tw-letter">${k === 'archer' ? 'B' : k === 'ice' ? 'I' : 'K'}</span> ${TOWERS[k].n}</b><span>${TOWERS[k].cost} mønter</span><small>${k === 'archer' ? 'Hurtige pile' : k === 'ice' ? 'Gør monstre langsomme' : 'Stor skade, langsom'}</small></button>`).join('')}</div>`;
   else {
     const up = t.lvl < MAX_LVL ? upgradeCost(t.type, t.lvl) : 0;
-    shop = `<div class="shop one"><p><b>${TOWERS[t.type].n}</b> · niveau ${t.lvl}</p><div class="row center-row">${t.lvl < MAX_LVL ? `<button class="btn primary" id="tw-up" type="button"${coins < up ? ' disabled' : ''}>Opgradér · ${up} mønter</button>` : '<span class="muted">Maks niveau</span>'}<button class="btn ghost" id="tw-sell" type="button">Sælg (+${towerSpent([t])})</button></div></div>`;
+    shop = `<div class="shop one"><p><b>${TOWERS[t.type].n}</b>, niveau ${t.lvl}</p><div class="row center-row">${t.lvl < MAX_LVL ? `<button class="btn primary" id="tw-up" type="button"${coins < up ? ' disabled' : ''}>Opgradér, ${up} mønter</button>` : '<span class="muted">Maks niveau</span>'}<button class="btn ghost" id="tw-sell" type="button">Sælg (+${towerSpent([t])})</button></div></div>`;
   }
-  r.innerHTML = `${topHTML()}<div class="center"><h2 class="big-msg sm">Byg tårne</h2><p class="coins"><b>${coins}</b> mønter · <span id="p-nextwave"></span></p></div>
+  r.innerHTML = `${topHTML()}<div class="center"><h2 class="big-msg sm">Byg tårne</h2><p class="coins"><b>${coins}</b> mønter, <span id="p-nextwave"></span></p></div>
     <canvas id="tw-cv" class="tw-cv" aria-label="Spillebane med fem pladser til tårne"></canvas>
     <div class="slots">${[0, 1, 2, 3, 4].map(i => `<button class="slot-b${i === P.sel ? ' on' : ''}" data-s="${i}" type="button">Plads ${i + 1}</button>`).join('')}</div>
     ${shop}<button class="btn primary big" id="tw-back" type="button">Tilbage til spørgsmålene</button>`;
@@ -373,7 +373,7 @@ function warMiniInner() {
   const f0 = Math.round(w.front[0] * 100), f1 = Math.round(w.front[1] * 100);
   return `<span class="wm-lbl">Statuernes liv</span><div class="wm-row"><b style="color:${TEAMS[0].c}">Rød</b>${bar(0)}${bar(1)}<b style="color:${TEAMS[1].c}">Blå</b></div>
     <span class="wm-lbl">Hvor langt hærene er nået</span><div class="wm-field"><i class="wm-f0" style="width:${f0}%"></i><i class="wm-f1" style="width:${f1}%"></i></div>
-    <p class="small muted center">Du har ${w.mine} ${w.mine === 1 ? 'soldat' : 'soldater'} på slagmarken${t === 0 ? ' for Rød' : ' for Blå'} · ${me.kills || 0} fældet</p>`;
+    <p class="small muted center">Du har ${w.mine} ${w.mine === 1 ? 'soldat' : 'soldater'} på slagmarken${t === 0 ? ' for Rød' : ' for Blå'}, ${me.kills || 0} fældet</p>`;
 }
 function warMini() { const m = $('#war-mini'); if (m) m.innerHTML = warMiniInner(); }
 function shopRefresh() {
@@ -410,7 +410,7 @@ function startSolo() {
   const loop = () => {
     if (!P || !P.ws) return;
     const cv = $('#ws-cv');
-    if (cv) drawBattle(cv, P.ws.b, { alpha: Math.min(1, (performance.now() - P.ws.last) / TICK_MS), labels: ['Dig', 'Computeren · slag ' + P.ws.stage], compact: true, colors: ['#3a8fdc', '#8d62cc'] });
+    if (cv) drawBattle(cv, P.ws.b, { alpha: Math.min(1, (performance.now() - P.ws.last) / TICK_MS), labels: ['Dig', 'Computeren, slag ' + P.ws.stage], compact: true, colors: ['#3a8fdc', '#8d62cc'] });
     warRaf = requestAnimationFrame(loop);
   };
   warRaf = requestAnimationFrame(loop);
@@ -453,7 +453,7 @@ function coopShopView() {
       <span class="ptrack"><i style="width:${full ? 100 : u.paid / u.cost * 100}%"></i></span>
       <div class="row">${full ? '<span class="muted small">Fuld</span>' : `<span class="small">${u.paid} / ${u.cost}</span><button class="btn" data-upg="${k}" data-amt="50" type="button"${g < 1 ? ' disabled' : ''}>+50 guld</button><button class="btn" data-upg="${k}" data-amt="${need}" type="button"${g < 1 ? ' disabled' : ''}>${need > g ? `Giv alt (${g} guld)` : `Betal resten (${need} guld)`}</button>`}</div></div>`;
   }).join('');
-  r.innerHTML = `${topHTML()}<div class="war-mini" id="coop-shop"><div class="coop-head"><b>Butikken er åben</b><span>Kampen starter om <b class="coop-left">${coopLeft()}</b> s</span></div>${coopBars()}<p class="small muted">${c.queued} nye soldater er klar · hæren har ${c.army}</p></div>
+  r.innerHTML = `${topHTML()}<div class="war-mini" id="coop-shop"><div class="coop-head"><b>Butikken er åben</b><span>Kampen starter om <b class="coop-left">${coopLeft()}</b> s</span></div>${coopBars()}<p class="small muted">${c.queued} nye soldater er klar, hæren har ${c.army}</p></div>
     <h3 class="sub-h">Soldater til næste kamp</h3>${shopHTML()}
     <h3 class="sub-h">Fælles opgraderinger</h3><p class="small muted mt0">I betaler sammen. Når bjælken er fuld, bliver hele hæren stærkere.</p><div class="upg-list">${upg}</div>`;
   bindShop();

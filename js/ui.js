@@ -60,13 +60,13 @@ export function fishSVG(color, junk, size = 120) {
 
 export function catchHTML(f) {
   if (!f) return '';
-  return `<div class="catch pop">${fishSVG(f.c, f.junk, 140)}<p class="outcome">${esc(f.n)}${f.junk ? '' : ` · ${fmtKg(f.kg)} kg`}</p>${f.legend ? '<p class="legend">Legendarisk fangst!</p>' : ''}</div>`;
+  return `<div class="catch pop">${fishSVG(f.c, f.junk, 140)}<p class="outcome">${esc(f.n)}${f.junk ? '' : `, ${fmtKg(f.kg)} kg`}</p>${f.legend ? '<p class="legend">Legendarisk fangst!</p>' : ''}</div>`;
 }
 
 // rows: [{n, pos, dot, me}]
 const RUN_C = ['var(--a)', 'var(--b)', 'var(--c)', 'var(--d)', 'var(--good)', 'var(--gold)'];
 export function raceHTML(rows, goal) {
-  return `<div class="race"><div class="race-head"><span>Start</span><span>Mål · ${goal} felter</span></div>` + rows.map((r, i) => {
+  return `<div class="race"><div class="race-head"><span>Start</span><span>Mål, ${goal} felter</span></div>` + rows.map((r, i) => {
     const pct = Math.min(100, r.pos / goal * 100);
     return `<div class="lane${r.me ? ' me' : ''}"><span class="lane-n">${esc(r.n)}</span><div class="lane-track">${r.av != null ? `<span class="runner av-run" style="left:calc(${pct}% - ${pct / 100 * 34}px)">${avatarSVG(r.av, 34)}</span>` : `<span class="runner" style="left:calc(${pct}% - ${pct / 100 * 30}px);background:${r.dot || RUN_C[[...(r.n || '')].reduce((h, c) => h + c.charCodeAt(0), 0) % RUN_C.length]}">${esc((r.n || '?').trim().charAt(0).toUpperCase())}</span>`}</div></div>`;
   }).join('') + '</div>';
@@ -81,7 +81,7 @@ export function drawTowerField(cv, { towers = [], frame = null, hp = null, sel =
   const css = getComputedStyle(document.documentElement);
   const col = n => css.getPropertyValue(n).trim() || '#888';
   g.clearRect(0, 0, W, H);
-  g.fillStyle = col('--frame'); g.fillRect(0, 0, W, H);
+  g.fillStyle = col('--color-hill-2'); g.fillRect(0, 0, W, H);
   const pad = 18, y0 = H * 0.62;
   const X = p => pad + (W - pad * 2 - 34) * (p / PATH_LEN);
   const Y = p => y0 + Math.sin(p / 14) * H * 0.06;
@@ -91,20 +91,20 @@ export function drawTowerField(cv, { towers = [], frame = null, hp = null, sel =
   g.stroke();
   // borg
   const cx = X(PATH_LEN) + 8;
-  g.fillStyle = col('--board-3'); g.fillRect(cx, y0 - 34, 26, 44);
-  g.fillStyle = col('--chalk'); for (let i = 0; i < 3; i++) g.fillRect(cx + i * 9, y0 - 40, 6, 6);
-  if (hp != null) { g.fillStyle = col('--chalk'); g.font = '700 12px system-ui'; g.textAlign = 'center'; g.fillText(hp + ' ♥', cx + 13, y0 + 24); }
+  g.fillStyle = col('--color-castle'); g.fillRect(cx, y0 - 34, 26, 44);
+  g.fillStyle = col('--color-castle'); for (let i = 0; i < 3; i++) g.fillRect(cx + i * 9, y0 - 40, 6, 6);
+  if (hp != null) { g.fillStyle = col('--color-ink'); g.font = '700 12px system-ui'; g.textAlign = 'center'; g.fillText(hp + ' ♥', cx + 13, y0 + 24); }
   // pladser og tårne
   SLOTS.forEach((p, i) => {
     const x = X(p), y = Y(p) - H * 0.3;
     const t = towers.find(z => z.slot === i);
-    g.strokeStyle = i === sel ? col('--accent') : 'rgba(238,240,228,.25)'; g.lineWidth = i === sel ? 3 : 1.5;
+    g.strokeStyle = i === sel ? col('--color-ink') : 'rgba(40,46,60,.35)'; g.lineWidth = i === sel ? 3 : 1.5;
     g.setLineDash(t ? [] : [4, 4]); g.strokeRect(x - 15, y - 15, 30, 30); g.setLineDash([]);
     if (t) {
       g.fillStyle = TOWERS[t.type].c; g.fillRect(x - 12, y - 12, 24, 24);
       g.fillStyle = 'rgba(0,0,0,.55)'; g.font = '800 12px system-ui'; g.textAlign = 'center'; g.textBaseline = 'middle';
       g.fillText(t.type === 'archer' ? 'B' : t.type === 'ice' ? 'I' : 'K', x, y);
-      for (let l = 0; l < t.lvl; l++) { g.fillStyle = col('--accent'); g.fillRect(x - 10 + l * 8, y + 16, 6, 4); }
+      for (let l = 0; l < t.lvl; l++) { g.fillStyle = col('--color-ink'); g.fillRect(x - 10 + l * 8, y + 16, 6, 4); }
     }
   });
   if (!frame) return;

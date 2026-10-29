@@ -136,7 +136,7 @@ async function runSearch(q) {
   try {
     const r = await commonsSearch(q, 16);
     if (!r.length) { box.innerHTML = '<p class="muted">Ingen billeder fundet. Prøv et andet ord, gerne på engelsk.</p>'; return; }
-    box.innerHTML = r.map((x, i) => `<button class="ip-hit" type="button" data-i="${i}"><img src="${esc(x.src)}" alt="" loading="lazy" onerror="this.closest('button').hidden=true;kqaPickGone()"><span>${esc(x.credit)} · ${esc(x.lic || 'fri licens')}</span></button>`).join('');
+    box.innerHTML = r.map((x, i) => `<button class="ip-hit" type="button" data-i="${i}"><img src="${esc(x.src)}" alt="" loading="lazy" onerror="this.closest('button').hidden=true;kqaPickGone()"><span>${esc(x.credit)}, ${esc(x.lic || 'fri licens')}</span></button>`).join('');
     $$('.ip-hit', box).forEach(b => { b.onclick = async () => { const x = r[+b.dataset.i]; b.disabled = true; b.querySelector('span').textContent = 'Henter…'; close(await localize({ src: x.src, credit: x.credit, lic: x.lic, page: x.page })); }; });
   } catch (e) {
     box.innerHTML = ''; err('Kunne ikke søge efter billeder. Tjek internetforbindelsen.');
@@ -165,7 +165,7 @@ export function initImagePicker() {
 
 export function imgHTML(img, cls = '') {
   if (!img || !img.src) return '';
-  const credit = img.credit ? `<figcaption>${img.page ? `<a href="${esc(img.page)}" target="_blank" rel="noopener">` : ''}${esc(img.credit)}${img.lic ? ' · ' + esc(img.lic) : ''}${img.page ? '</a>' : ''}</figcaption>` : '';
+  const credit = img.credit ? `<figcaption>${img.page ? `<a href="${esc(img.page)}" target="_blank" rel="noopener">` : ''}${esc(img.credit)}${img.lic ? ', ' + esc(img.lic) : ''}${img.page ? '</a>' : ''}</figcaption>` : '';
   return `<figure class="qimg ${cls}"><img src="${esc(img.src)}" alt="" decoding="async" onerror="kqaImgErr(this)">${credit}</figure>`;
 }
 

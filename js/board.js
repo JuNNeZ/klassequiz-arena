@@ -28,7 +28,7 @@ function strip() { if (G.teams.length) teamStrip(G.teams.map(t => ({ n: t.n, c: 
 function nextQ() {
   G.qi++; G.phase = 'q'; G.right = new Set();
   const q = G.qs[G.qi];
-  setCount(`Spørgsmål ${G.qi + 1} af ${G.qs.length} · ${MODES[G.mode].name}`);
+  setCount(`Spørgsmål ${G.qi + 1} af ${G.qs.length}, ${MODES[G.mode].name}`);
   setStatus('<kbd>Mellemrum</kbd> går videre');
   body(questionHTML(q.q, { img: q.img, multi: correctIdx(q).length > 1, pop: true }) + tilesHTML(q.opts.map(x => x.t)));
   strip();
