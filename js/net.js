@@ -51,7 +51,7 @@ export class Client {
   constructor(code, { onData, onStatus }) {
     this.code = code; this.onData = onData; this.onStatus = onStatus;
     this.conn = null; this.dead = false; this.retryT = 0; this.openT = 0; this.fails = 0; this.relay = false;
-    this.diag = { server: 'wait', host: 'wait', tries: 0, relay: false };
+    this.diag = { server: 'wait', host: 'wait', tries: 0, relay: false, turn: 'wait' };
     this.makePeer();
   }
   emit(st) { if (!this.dead) this.onStatus(st, { ...this.diag }); }
@@ -94,7 +94,12 @@ export class Client {
     c.on('error', () => { /* close følger */ });
     try {
       const pc = c.peerConnection;
-      if (pc) pc.addEventListener('iceconnectionstatechange', () => { if (pc.iceConnectionState === 'failed' && !(this.conn && this.conn.open)) { clearTimeout(this.openT); this.failed(); } });
+      if (pc) {
+        pc.addEventListener('iceconnectionstatechange', () => { if (pc.iceConnectionState === 'failed' && !(this.conn && this.conn.open)) { clearTimeout(this.openT); this.failed(); } });
+        // Kan enheden nå relæserveren? Den skal bruges, når skolens net blokerer direkte forbindelser.
+        pc.addEventListener('icecandidate', ev => { const cd = ev.candidate; if (cd && / typ relay/.test(cd.candidate || '') && this.diag.turn !== 'ok') { this.diag.turn = 'ok'; if (!(this.conn && this.conn.open)) this.emit('connecting'); } });
+        pc.addEventListener('icegatheringstatechange', () => { if (pc.iceGatheringState === 'complete' && this.diag.turn !== 'ok') { this.diag.turn = 'fail'; if (!(this.conn && this.conn.open)) this.emit('connecting'); } });
+      }
     } catch (e) { /* */ }
   }
   failed() {

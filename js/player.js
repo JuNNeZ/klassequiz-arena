@@ -146,7 +146,7 @@ const root = () => $('#play');
 function diagHTML() {
   const d = P && P.diag; if (!d) return '';
   const mark = v => v === 'ok' ? '<b class="ok-c">✓</b>' : v === 'fail' ? '<b class="bad-c">✕</b>' : '<span class="muted">…</span>';
-  return `<ul class="diag"><li>${mark(d.server)} Forbindelse til netværket</li><li>${mark(d.host)} Forbindelse til lærerens skærm${d.tries > 1 ? `, forsøg ${d.tries}` : ''}${d.relay ? ', via relæ' : ''}</li></ul>`;
+  return `<ul class="diag"><li>${mark(d.server)} Forbindelse til netværket</li><li>${mark(d.host)} Forbindelse til lærerens skærm${d.tries > 1 ? `, forsøg ${d.tries}` : ''}${d.relay ? ', via relæ' : ''}</li>${d.tries > 1 ? `<li>${mark(d.turn === 'wait' ? '' : d.turn)} Relæserver${d.turn === 'fail' ? ' (kan ikke nås fra dette net)' : ''}</li>` : ''}</ul>`;
 }
 function msg(h, p, cls, withDiag) {
   root().innerHTML = `<div class="state ${cls || ''}"><h2>${esc(h)}</h2>${p ? `<p class="muted">${esc(p)}</p>` : ''}${withDiag ? diagHTML() : ''}</div><div class="row center-row"><button class="btn ghost" id="p-leave" type="button">Forlad spillet</button></div>`;

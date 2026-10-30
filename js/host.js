@@ -1,6 +1,6 @@
 // LIVE: lærerens skærm er vært. Hver elev spiller i eget tempo på sin enhed;
 // lærerskærmen viser den samlede stilling live. Eleverne forbinder uden login.
-import { $$, esc, SFX, cleanName, fmt } from './util.js';
+import { $$, esc, SFX, cleanName, fmt, toast } from './util.js';
 import {
   MODES, TEAMS, prepQuestions, correctIdx, speedPoints, streakBonus, rollChest, liveRaceGoal, liveRaceSteps, rollFish, fishLuck, fmtKg,
   shuffle, DUEL_HP, duelDamage, towerCoinsFor, towerSpent, validTowers, simWave, towerScore, CASTLE_HP, WAVE_FIRST_MS, WAVE_EVERY_MS,
@@ -45,18 +45,50 @@ export async function startHost(quiz, o, onAgain) {
   }
   if (!stage.G || stage.G !== H) { try { H.peer && H.peer.destroy(); } catch (e) { /* */ } return; }
   if (!H.peer) { body('<div class="state bad"><h2>Kunne ikke finde en ledig kode</h2><p>Prøv igen om lidt.</p></div>'); setNext('Tilbage', exitGame); return; }
-  H.peer.on('connection', conn => {
-    conn.on('data', d => onMsg(conn, d));
-    conn.on('close', () => { const p = H && H.players.get(conn._sid); if (p && p.conn === conn) { p.conn = null; p.online = false; if (H.mode === 'duel' && H.phase === 'play') dropDuel(p); dirty(); } });
-    conn.on('error', () => { /* close følger */ });
-  });
-  H.peer.on('disconnected', () => { try { H.peer.reconnect(); } catch (e) { /* */ } });
-  H.peer.on('error', e => { if (e && e.type === 'network') setStatus('Netværket hakker… nye elever kan måske ikke komme ind lige nu'); });
+  attachPeer(H.peer);
+  // Vagthund: mister lærerens browser forbindelsen til spilserveren, kan nye elever ikke finde spillet.
+  // Den er ofte væk uden at sige det (skolens net lukker lange forbindelser), så vi tjekker hvert 3. sekund.
+  H.netT = setInterval(watchPeer, 3000);
   H.onTick = tick;
   H.phase = 'lobby';
   lobby();
 }
-function cleanup() { music.stop(); clearInterval(H && H.warT); cancelAnimationFrame(H && H.warRaf); try { H && H.peer && H.peer.destroy(); } catch (e) { /* */ } H = null; }
+function attachPeer(pr) {
+  pr.on('connection', conn => {
+    conn.on('data', d => onMsg(conn, d));
+    conn.on('close', () => { const p = H && H.players.get(conn._sid); if (p && p.conn === conn) { p.conn = null; p.online = false; if (H.mode === 'duel' && H.phase === 'play') dropDuel(p); dirty(); } });
+    conn.on('error', () => { /* close følger */ });
+  });
+  pr.on('disconnected', () => { if (H && H.peer === pr && !pr.destroyed) { try { pr.reconnect(); } catch (e) { /* */ } } });
+  pr.on('open', () => { if (H && H.peer === pr) setNet(false); });
+  pr.on('error', e => { if (H && H.peer === pr && e && (e.type === 'network' || e.type === 'server-error' || e.type === 'socket-error' || e.type === 'socket-closed')) setNet(true); });
+}
+async function watchPeer() {
+  const h = H, pr = h && h.peer; if (!pr || h.rebuilding) return;
+  if (pr.destroyed) {
+    // Helt tabt: opret værten igen med samme kode. Elever, der allerede er inde, beholder deres forbindelse.
+    setNet(true); h.rebuilding = true;
+    try { const np = await openHost(h.code); if (H === h) { h.peer = np; attachPeer(np); setNet(false); } else np.destroy(); }
+    catch (e) { /* prøver igen ved næste tjek */ }
+    h.rebuilding = false;
+    return;
+  }
+  if (pr.disconnected) { setNet(true); try { pr.reconnect(); } catch (e) { /* */ } }
+  else if (H.netBad && pr.open) setNet(false);
+}
+function setNet(bad) {
+  if (!H || H.netBad === bad) return;
+  H.netBad = bad;
+  if (bad) toast('Forbindelsen til spilserveren er væk. Prøver igen…');
+  else toast('Forbindelsen er tilbage. Nye elever kan komme ind igen.');
+  refreshStatus();
+}
+function hostStatus(s) {
+  H.lastStatus = s;
+  setStatus(H.netBad ? '<b class="err">Nye elever kan ikke komme ind lige nu. Prøver at genoprette forbindelsen…</b>' : s);
+}
+function refreshStatus() { if (H && H.lastStatus != null) hostStatus(H.lastStatus); }
+function cleanup() { music.stop(); clearInterval(H && H.warT); clearInterval(H && H.netT); cancelAnimationFrame(H && H.warRaf); try { H && H.peer && H.peer.destroy(); } catch (e) { /* */ } H = null; }
 
 /* ---------- hjælpere ---------- */
 const everyone = () => [...H.players.values()].filter(p => !H.banned.has(p.sid));
@@ -317,7 +349,7 @@ function lobby() {
   });
   H.seenChip = new Set(ps.map(p => p.sid));
   if (H.teamsN) teamStrip(TEAMS.slice(0, H.teamsN).map((t, i) => ({ n: t.n, c: t.c, score: ps.filter(p => p.team === i).length })), 'elever');
-  setStatus(active().length ? '<kbd>Mellemrum</kbd> starter' : 'Venter på elever');
+  hostStatus(active().length ? '<kbd>Mellemrum</kbd> starter' : 'Venter på elever');
   setNext('Start spillet', start, !active().length);
 }
 function kick(sid) {
@@ -354,7 +386,7 @@ function draw() {
   if (H.mode === 'warcoop') return drawCoop();
   const n = everyone().length, a = active().length;
   setCount(`${MODES[H.mode].name}, ${a} ${a === 1 ? 'elev' : 'elever'} spiller${a < n ? ` (${n - a} væk)` : ''}`);
-  setStatus(`Kode <b>${H.code}</b>, nye elever kan stadig deltage`);
+  hostStatus(`Kode <b>${H.code}</b>, nye elever kan stadig deltage`);
   const rows = sorted();
   const unit = { gold: 'guld', fish: 'kg', race: 'felter', duel: 'sejre', self: 'rigtige', war: 'skade' }[H.mode] || '';
   const R = p => ({ k: p.sid, n: p.nm, av: p.av, v: val(p), dot: p.team >= 0 ? TEAMS[p.team].c : '', sub: sub(p) });
@@ -443,7 +475,7 @@ function teamDmg(t) { return everyone().filter(p => p.team === t).reduce((s, p) 
 function drawWar() {
   const n = everyone().length, a = active().length;
   setCount(`Pindekrig: ${a} ${a === 1 ? 'elev' : 'elever'} kæmper${a < n ? ` (${n - a} væk)` : ''}`);
-  setStatus(`Kode <b>${H.code}</b>, nye elever kan stadig deltage`);
+  hostStatus(`Kode <b>${H.code}</b>, nye elever kan stadig deltage`);
   if (!document.getElementById('war-cv')) {
     body(`<div class="war-stage"><canvas id="war-cv" class="war-cv" aria-label="Slagmarken"></canvas>
       <div class="live"><div class="live-main"><div class="war-teams" id="war-teams"></div><h3 class="sub-h">Mest skade</h3><div id="war-lb"></div></div>
@@ -567,7 +599,7 @@ function drawCoop() {
   const c = H.coop, n = everyone().length, a = active().length;
   const title = { q: 'Svar på spørgsmål', shop: 'Køb soldater og opgraderinger', battle: 'Kamp!' }[c.sub];
   setCount(`Runde ${c.round}${c.rounds < 99 ? ' af ' + c.rounds : ''}, ${title}, ${a} ${a === 1 ? 'elev' : 'elever'}${a < n ? ` (${n - a} væk)` : ''}`);
-  setStatus(`Kode <b>${H.code}</b>, nye elever kan stadig deltage`);
+  hostStatus(`Kode <b>${H.code}</b>, nye elever kan stadig deltage`);
   if (!document.getElementById('war-cv')) {
     body(`<div class="war-stage"><div class="coop-banner" id="coop-banner"></div><canvas id="war-cv" class="war-cv" aria-label="Slagmarken"></canvas>
       <div class="live"><div class="live-main"><div class="coop-upg" id="coop-upg"></div><h3 class="sub-h">Mest skade</h3><div id="war-lb"></div></div>
