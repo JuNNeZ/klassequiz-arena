@@ -9,7 +9,7 @@ let turnCache = null;
 // Skolens egen relæadgang hos Metered (gratis plan). API-nøglen er beregnet til at stå i browserkoden.
 // Udfyld METERED_KEY med "API Key" fra Metered > TURN Server. Tom = kun den fælles Open Relay.
 const METERED_APP = 'klassequiz-arena';
-const METERED_KEY = '';
+const METERED_KEY = '28eb7e7c7a62c2a097455dfee8ed11cee89f';
 async function meteredServers() {
   if (!METERED_KEY) return [];
   const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 4000);
