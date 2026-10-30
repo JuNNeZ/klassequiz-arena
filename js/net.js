@@ -6,21 +6,39 @@ export const p2pAvailable = () => typeof window.Peer === 'function';
 
 const STUN = [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun.cloudflare.com:3478' }];
 let turnCache = null;
-// Open Relay "static auth": midlertidigt brugernavn + HMAC af den offentlige nøgle
-async function turnServers() {
-  if (turnCache && turnCache.exp > Date.now() + 3600e3) return turnCache.list;
+// Skolens egen relæadgang hos Metered (gratis plan). API-nøglen er beregnet til at stå i browserkoden.
+// Udfyld METERED_KEY med "API Key" fra Metered > TURN Server. Tom = kun den fælles Open Relay.
+const METERED_APP = 'klassequiz-arena';
+const METERED_KEY = '';
+async function meteredServers() {
+  if (!METERED_KEY) return [];
+  const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 4000);
+  try {
+    const r = await fetch(`https://${METERED_APP}.metered.live/api/v1/turn/credentials?apiKey=${encodeURIComponent(METERED_KEY)}`, { signal: ctl.signal });
+    if (!r.ok) return [];
+    const list = await r.json();
+    return Array.isArray(list) ? list.filter(x => x && x.urls) : [];
+  } catch (e) { return []; } finally { clearTimeout(t); }
+}
+// Open Relay "static auth": midlertidigt brugernavn + HMAC af den offentlige nøgle (reserve)
+async function openRelay() {
   try {
     const exp = Math.floor(Date.now() / 1000) + 12 * 3600;
     const username = exp + ':klassequiz';
     const key = await crypto.subtle.importKey('raw', new TextEncoder().encode('openrelayprojectsecret'), { name: 'HMAC', hash: 'SHA-1' }, false, ['sign']);
     const sig = new Uint8Array(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(username)));
     let bin = ''; sig.forEach(b => { bin += String.fromCharCode(b); });
-    const credential = btoa(bin);
     const h = 'staticauth.openrelay.metered.ca';
-    const list = [{ urls: [`turn:${h}:80`, `turn:${h}:80?transport=tcp`, `turn:${h}:443`, `turns:${h}:443?transport=tcp`], username, credential }];
-    turnCache = { exp: exp * 1000, list };
-    return list;
+    return [{ urls: [`turn:${h}:80`, `turn:${h}:80?transport=tcp`, `turn:${h}:443`, `turns:${h}:443?transport=tcp`], username, credential: btoa(bin) }];
   } catch (e) { return []; }
+}
+async function turnServers() {
+  if (turnCache && turnCache.exp > Date.now()) return turnCache.list;
+  const own = await meteredServers();
+  // Egen adgang først; den fælles kun som reserve. STUN fra Metered springes over (vi har vores egne).
+  const list = [...own.filter(x => !String(x.urls).startsWith('stun:')), ...(own.length ? [] : await openRelay())];
+  turnCache = { exp: Date.now() + (own.length ? 6 : 1) * 3600e3, list };
+  return list;
 }
 
 export async function peerOptions(relayOnly = false) {
